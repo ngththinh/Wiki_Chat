@@ -7,6 +7,10 @@ interface InputFieldProps {
   type?: "text" | "email" | "password";
   placeholder?: string;
   required?: boolean;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  error?: string;
+  name?: string;
 }
 
 export default function InputField({
@@ -14,6 +18,10 @@ export default function InputField({
   type = "text",
   placeholder,
   required = false,
+  value,
+  onChange,
+  error,
+  name,
 }: InputFieldProps) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
@@ -28,7 +36,14 @@ export default function InputField({
         <input
           type={isPassword && showPassword ? "text" : type}
           placeholder={placeholder}
-          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-12"
+          value={value}
+          onChange={onChange}
+          name={name}
+          className={`w-full px-4 py-3 bg-gray-50 border ${
+            error ? "border-red-500" : "border-gray-200"
+          } rounded-lg focus:outline-none focus:ring-2 ${
+            error ? "focus:ring-red-500" : "focus:ring-blue-500"
+          } focus:border-transparent transition-all pr-12`}
         />
         {isPassword && (
           <button
@@ -74,6 +89,7 @@ export default function InputField({
           </button>
         )}
       </div>
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );
 }
