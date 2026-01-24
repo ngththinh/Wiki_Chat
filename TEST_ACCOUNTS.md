@@ -6,10 +6,10 @@ Hệ thống hiện đang sử dụng **Mock Authentication Service** để test
 
 ### Tài Khoản Có Sẵn
 
-| Email              | Password      | Tên       | Mô Tả                |
-| ------------------ | ------------- | --------- | -------------------- |
-| `test@example.com` | `password123` | Test User | Tài khoản test chính |
-| `demo@example.com` | `demo123`     | Demo User | Tài khoản demo       |
+| Email                  | Password   | Tên        | Vai trò | Mô Tả                            |
+| ---------------------- | ---------- | ---------- | ------- | -------------------------------- |
+| `demo@example.com`     | `demo123`  | Demo User  | User    | Tài khoản demo                   |
+| `admin@wikichatbot.vn` | `admin123` | Admin User | Admin   | Tài khoản admin quản lý tài liệu |
 
 ---
 

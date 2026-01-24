@@ -19,7 +19,7 @@ export default function ChatSidebar({
   answer,
 }: ChatSidebarProps) {
   return (
-    <div className="relative hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-400 p-12">
+    <div className="relative hidden lg:flex lg:w-1/2 bg-linear-to-br from-blue-500 via-purple-500 to-pink-400 p-12">
       <div className="flex flex-col justify-between w-full">
         {/* Logo */}
         <div className="flex items-center gap-2">

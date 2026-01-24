@@ -5,100 +5,119 @@ import { useRouter } from "next/navigation";
 import authService from "@/lib/authService";
 import ChatSidebarNav from "@/components/chat/ChatSidebarNav";
 import ChatMessages from "@/components/chat/ChatMessages";
-import ChatInput, { ChatModel } from "@/components/chat/ChatInput";
+import ChatInput from "@/components/chat/ChatInput";
+import GuestHeader from "@/components/chat/GuestHeader";
+import { TIMING } from "@/constants";
+import {
+  Message,
+  createMessage,
+  loadMessagesFromStorage,
+  saveMessagesToStorage,
+  clearMessagesFromStorage,
+  getLastUserMessage,
+} from "@/utils/chat";
+import { ChatModel, detectModelFromSubdomain } from "@/utils/subdomain";
 
 export default function ChatScreen() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [isGuest, setIsGuest] = useState(true);
   const [currentChat, setCurrentChat] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ChatModel>("RAG");
+  const [isSubdomainModel, setIsSubdomainModel] = useState(false);
 
+  // Detect subdomain and set model accordingly
   useEffect(() => {
-    // Check authentication
+    const { model, isSubdomainModel: isSubdomain } = detectModelFromSubdomain();
+    setSelectedModel(model);
+    setIsSubdomainModel(isSubdomain);
+  }, []);
+
+  // Check authentication and load messages
+  useEffect(() => {
     const currentUser = authService.getCurrentUser();
-    if (!currentUser) {
-      router.push("/login");
-      return;
+
+    if (currentUser) {
+      setUser(currentUser);
+      setIsGuest(false);
+      // When logged in, start with empty messages
+      setMessages([]);
+      // TODO: Load chat history from backend for logged-in user
+    } else {
+      setIsGuest(true);
+      // Guest mode: start fresh, no localStorage persistence
+      setMessages([]);
     }
-    setUser(currentUser);
-  }, [router]);
+  }, []);
 
   const handleSendMessage = async (message: string, model: ChatModel) => {
     if (!message.trim()) return;
 
-    // Add user message
-    const userMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: message,
-      timestamp: new Date(),
-      model: model,
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    const userMessage = createMessage("user", message, model);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setIsLoading(true);
+
+    // Guest messages are not saved to localStorage (memory only)
 
     // Simulate AI response (replace with actual API call)
     setTimeout(() => {
-      const aiMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `This is a simulated response using ${model} model to: "${message}". In production, this would be replaced with actual AI responses about entrepreneurs and business insights.`,
-        timestamp: new Date(),
-        model: model,
-      };
-      setMessages((prev) => [...prev, aiMessage]);
+      const aiResponse = `Đây là phản hồi mô phỏng sử dụng mô hình ${model} cho câu hỏi: "${message}". Trong thực tế, đây sẽ là câu trả lời thực từ AI về các danh nhân Việt Nam.`;
+      const aiMessage = createMessage("assistant", aiResponse, model);
+      const finalMessages = [...updatedMessages, aiMessage];
+      setMessages(finalMessages);
       setIsLoading(false);
-    }, 1500);
+
+      // Guest messages stay in memory only
+      // TODO: Save to backend for logged-in user
+    }, TIMING.AI_RESPONSE_DELAY);
   };
 
   const handleNewChat = () => {
     setMessages([]);
     setCurrentChat(null);
+
+    if (isGuest) {
+      clearMessagesFromStorage();
+    }
   };
 
   const handleRegenerateResponse = () => {
     if (messages.length === 0) return;
 
-    // Get the last user message
-    const lastUserMessage = messages.filter((m) => m.role === "user").pop();
-
+    const lastUserMessage = getLastUserMessage(messages);
     if (lastUserMessage) {
-      // Remove last AI response
       setMessages((prev) => prev.slice(0, -1));
-      // Regenerate
       handleSendMessage(lastUserMessage.content, selectedModel);
     }
   };
 
   const handleModelChange = (model: ChatModel) => {
-    setSelectedModel(model);
+    // Only allow model change if not using subdomain routing
+    if (!isSubdomainModel) {
+      setSelectedModel(model);
+    }
   };
-
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <ChatSidebarNav
-        user={user}
-        onNewChat={handleNewChat}
-        currentChat={currentChat}
-      />
+      {/* Sidebar - Only show when logged in */}
+      {!isGuest && (
+        <ChatSidebarNav
+          user={user}
+          isGuest={isGuest}
+          onNewChat={handleNewChat}
+          currentChat={currentChat}
+        />
+      )}
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
+        {/* Guest Header - Only show when guest */}
+        {isGuest && <GuestHeader />}
+
         {/* Chat Messages */}
         <ChatMessages
           messages={messages}
@@ -112,6 +131,7 @@ export default function ChatScreen() {
           isLoading={isLoading}
           selectedModel={selectedModel}
           onModelChange={handleModelChange}
+          isSubdomainModel={isSubdomainModel}
         />
       </div>
     </div>

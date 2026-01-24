@@ -1,5 +1,7 @@
 // API Client Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api';
+// Frontend Next.js: http://localhost:3000
+// Backend API: http://localhost:8000 (default, hoặc set NEXT_PUBLIC_API_BASE_URL)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 
 export interface ApiResponse<T> {
   success: boolean;
