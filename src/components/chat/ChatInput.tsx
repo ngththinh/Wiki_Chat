@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, KeyboardEvent, useRef, useEffect } from "react";
-
-export type ChatModel = "RAG" | "GraphRAG";
+import { ChatModel } from "@/utils/subdomain";
+import { MODELS } from "@/constants";
 
 interface ChatInputProps {
   onSendMessage: (message: string, model: ChatModel) => void;
   isLoading: boolean;
   selectedModel: ChatModel;
   onModelChange: (model: ChatModel) => void;
+  isSubdomainModel?: boolean;
 }
 
 export default function ChatInput({
@@ -16,6 +17,7 @@ export default function ChatInput({
   isLoading,
   selectedModel,
   onModelChange,
+  isSubdomainModel = false,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -58,7 +60,7 @@ export default function ChatInput({
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex-shrink-0 flex items-center gap-1 px-2 py-1.5 text-[11px] font-semibold bg-white rounded-lg border border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all shadow-sm group"
+              className="shrink-0 flex items-center gap-1 px-2 py-1.5 text-[11px] font-semibold bg-white rounded-lg border border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all shadow-sm cursor-pointer"
               title="Select AI Model"
             >
               <svg
@@ -100,11 +102,11 @@ export default function ChatInput({
                 </div>
                 <button
                   onClick={() => {
-                    onModelChange("RAG");
+                    onModelChange(MODELS.RAG as ChatModel);
                     setIsDropdownOpen(false);
                   }}
                   className={`w-full text-left px-2.5 py-2 text-[11px] font-medium transition-colors ${
-                    selectedModel === "RAG"
+                    selectedModel === MODELS.RAG
                       ? "bg-blue-50 text-blue-700"
                       : "text-gray-700 hover:bg-gray-50"
                   }`}
@@ -123,12 +125,14 @@ export default function ChatInput({
                       />
                     </svg>
                     <div className="flex-1">
-                      <div className="font-semibold text-[11px]">RAG</div>
+                      <div className="font-semibold text-[11px]">
+                        {MODELS.RAG}
+                      </div>
                       <div className="text-[9px] text-gray-500">
                         Retrieval Model
                       </div>
                     </div>
-                    {selectedModel === "RAG" && (
+                    {selectedModel === MODELS.RAG && (
                       <svg
                         className="w-3 h-3 text-blue-600"
                         fill="currentColor"
@@ -145,11 +149,11 @@ export default function ChatInput({
                 </button>
                 <button
                   onClick={() => {
-                    onModelChange("GraphRAG");
+                    onModelChange(MODELS.GRAPH_RAG as ChatModel);
                     setIsDropdownOpen(false);
                   }}
                   className={`w-full text-left px-2.5 py-2 text-[11px] font-medium transition-colors ${
-                    selectedModel === "GraphRAG"
+                    selectedModel === MODELS.GRAPH_RAG
                       ? "bg-blue-50 text-blue-700"
                       : "text-gray-700 hover:bg-gray-50"
                   }`}
@@ -163,12 +167,14 @@ export default function ChatInput({
                       <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                     </svg>
                     <div className="flex-1">
-                      <div className="font-semibold text-[11px]">GraphRAG</div>
+                      <div className="font-semibold text-[11px]">
+                        {MODELS.GRAPH_RAG}
+                      </div>
                       <div className="text-[9px] text-gray-500">
                         Graph Model
                       </div>
                     </div>
-                    {selectedModel === "GraphRAG" && (
+                    {selectedModel === MODELS.GRAPH_RAG && (
                       <svg
                         className="w-3 h-3 text-blue-600"
                         fill="currentColor"
@@ -193,7 +199,7 @@ export default function ChatInput({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="What's in your mind..."
+            placeholder="Bạn muốn hỏi gì về danh nhân..."
             disabled={isLoading}
             className="flex-1 bg-transparent border-none outline-none text-gray-800 placeholder-gray-400 text-sm disabled:opacity-50"
           />
@@ -202,7 +208,7 @@ export default function ChatInput({
           <button
             onClick={handleSend}
             disabled={!message.trim() || isLoading}
-            className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white flex items-center justify-center hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-110 shadow-md"
+            className="shrink-0 w-10 h-10 rounded-full bg-linear-to-r from-blue-600 to-purple-600 text-white flex items-center justify-center hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-110 shadow-md"
           >
             {isLoading ? (
               <svg

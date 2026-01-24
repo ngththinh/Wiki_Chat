@@ -1,5 +1,7 @@
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001/api';
+// Port 3000 is for frontend Next.js dev server
+// Port 8000 is default for backend API (when available)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 
 // API Response Types
 export interface ApiResponse<T> {
@@ -132,8 +134,9 @@ export const authService = {
 export const mockAuthService = {
   // Mock users database
   users: [
-    { id: '1', email: 'test@example.com', password: 'password123', name: 'Test User' },
-    { id: '2', email: 'demo@example.com', password: 'demo123', name: 'Demo User' },
+    { id: '1', email: 'test@example.com', password: 'password123', name: 'Test User', role: 'user' as const },
+    { id: '2', email: 'demo@example.com', password: 'demo123', name: 'Demo User', role: 'user' as const },
+    { id: '3', email: 'admin@wikichatbot.vn', password: 'admin123', name: 'Admin User', role: 'admin' as const },
   ],
 
   async login(email: string, password: string): Promise<ApiResponse<LoginResponse>> {
@@ -150,7 +153,7 @@ export const mockAuthService = {
     }
 
     const token = `mock-token-${user.id}-${Date.now()}`;
-    const userData = { id: user.id, email: user.email, name: user.name };
+    const userData = { id: user.id, email: user.email, name: user.name, role: user.role };
 
     // Save to localStorage
     localStorage.setItem('authToken', token);
@@ -184,12 +187,13 @@ export const mockAuthService = {
       email,
       password,
       name: email.split('@')[0],
+      role: 'user' as const,
     };
 
     this.users.push(newUser);
 
     const token = `mock-token-${newUser.id}-${Date.now()}`;
-    const userData = { id: newUser.id, email: newUser.email, name: newUser.name };
+    const userData = { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role };
 
     // Save to localStorage
     localStorage.setItem('authToken', token);

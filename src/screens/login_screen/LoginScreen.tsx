@@ -6,19 +6,22 @@ import { useRouter } from "next/navigation";
 import { ChatSidebar, SocialLoginButtons } from "@/components/auth";
 import { InputField } from "@/components/common";
 import authService from "@/lib/authService";
+import { ROUTES, MESSAGES } from "@/constants";
+import { LOGIN_CHAT_DATA } from "@/constants/chatData";
+import {
+  validateLoginForm,
+  type LoginFormData,
+  type ValidationErrors,
+} from "@/utils/validation";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: "",
     rememberMe: false,
   });
-  const [errors, setErrors] = useState({
-    email: "",
-    password: "",
-    general: "",
-  });
+  const [errors, setErrors] = useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,43 +30,19 @@ export default function LoginScreen() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-    // Clear errors when user types
-    if (errors[name as keyof typeof errors]) {
+
+    // Clear error when user types
+    if (errors[name as keyof ValidationErrors]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  const validateForm = () => {
-    const newErrors = { email: "", password: "", general: "" };
-    let isValid = true;
-
-    // Email validation
-    if (!formData.email) {
-      newErrors.email = "Email is required";
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email";
-      isValid = false;
-    }
-
-    // Password validation
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-      isValid = false;
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrors({ email: "", password: "", general: "" });
 
-    if (!validateForm()) {
+    const validationErrors = validateLoginForm(formData);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
@@ -72,69 +51,43 @@ export default function LoginScreen() {
     try {
       const response = await authService.login(
         formData.email,
-        formData.password
+        formData.password,
       );
 
       if (response.success) {
-        // Redirect to chat page
-        router.push("/chat");
+        // Check user role and redirect accordingly
+        const user = authService.getCurrentUser();
+        if (user?.role === "admin") {
+          router.push(ROUTES.ADMIN);
+        } else {
+          router.push(ROUTES.CHAT);
+        }
       } else {
-        setErrors((prev) => ({
-          ...prev,
-          general: response.error || "Login failed. Please try again.",
-        }));
+        setErrors({
+          general: response.error || MESSAGES.ERROR.LOGIN_FAILED,
+        });
       }
     } catch (error) {
-      setErrors((prev) => ({
-        ...prev,
-        general: "An unexpected error occurred. Please try again.",
-      }));
+      setErrors({ general: MESSAGES.ERROR.GENERIC_ERROR });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const chatData = {
-    title: "Welcome Back!\nContinue Your Journey.",
-    subtitle: "Ask about any entrepreneur...",
-    question: "What made Warren Buffett one of the most successful investors?",
-    answer: {
-      intro:
-        "Warren Buffett's success comes from timeless investment principles and entrepreneurial mindset:",
-      points: [
-        {
-          title: "Long-Term Thinking",
-          content:
-            "Buffett focuses on long-term value rather than short-term gains. He famously said 'Our favorite holding period is forever' and builds businesses for decades, not quarters.",
-        },
-        {
-          title: "Value Investing Philosophy",
-          content:
-            "He buys great companies at fair prices, focusing on strong fundamentals, competitive advantages, and capable management teams rather than following market trends.",
-        },
-        {
-          title: "Continuous Learning",
-          content:
-            "Buffett spends 80% of his day reading and thinking. He constantly studies businesses, markets, and learns from mistakes to refine his investment approach.",
-        },
-      ],
-      conclusion:
-        "His principles apply beyond investing—patience, continuous learning, and focus on fundamentals are universal entrepreneurial traits.",
-    },
-  };
-
   return (
     <div className="flex min-h-screen">
-      <ChatSidebar {...chatData} />
+      <ChatSidebar {...LOGIN_CHAT_DATA} />
 
       {/* Right Side - Login Form */}
       <div className="flex flex-1 items-center justify-center px-8 py-12 lg:w-1/2 bg-white">
         <div className="w-full max-w-md space-y-8">
           {/* Header */}
           <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-gray-900">Welcome back</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Chào mừng trở lại
+            </h1>
             <p className="text-sm text-gray-500">
-              Login to continue your entrepreneurial learning journey
+              Đăng nhập để tiếp tục khám phá câu chuyện các danh nhân
             </p>
           </div>
 
@@ -147,10 +100,10 @@ export default function LoginScreen() {
             )}
 
             <InputField
-              label="Email Address"
+              label="Địa chỉ Email"
               type="email"
               name="email"
-              placeholder="ex: email@example.com"
+              placeholder="vd: email@example.com"
               value={formData.email}
               onChange={handleInputChange}
               error={errors.email}
@@ -158,10 +111,10 @@ export default function LoginScreen() {
             />
 
             <InputField
-              label="Password"
+              label="Mật khẩu"
               type="password"
               name="password"
-              placeholder="Enter password"
+              placeholder="Nhập mật khẩu"
               value={formData.password}
               onChange={handleInputChange}
               error={errors.password}
@@ -180,14 +133,14 @@ export default function LoginScreen() {
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <label htmlFor="remember" className="text-sm text-gray-600">
-                  Remember me
+                  Ghi nhớ tôi
                 </label>
               </div>
               <Link
                 href="/forgot-password"
                 className="text-sm text-blue-600 hover:underline font-medium"
               >
-                Forgot password?
+                Quên mật khẩu?
               </Link>
             </div>
 
@@ -197,18 +150,18 @@ export default function LoginScreen() {
               disabled={isLoading}
               className="w-full py-3 bg-blue-600 text-white font-medium rounded-full hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Logging in..." : "Login"}
+              {isLoading ? MESSAGES.LOADING.LOGIN : "Đăng nhập"}
             </button>
 
             {/* Sign Up Link */}
             <div className="text-center">
               <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
+                Chưa có tài khoản?{" "}
                 <Link
-                  href="/register"
+                  href={ROUTES.REGISTER}
                   className="text-blue-600 font-medium hover:underline"
                 >
-                  Sign up
+                  Đăng ký ngay
                 </Link>
               </p>
             </div>
@@ -220,7 +173,7 @@ export default function LoginScreen() {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-4 bg-white text-gray-500">
-                  Or login with
+                  Hoặc đăng nhập bằng
                 </span>
               </div>
             </div>

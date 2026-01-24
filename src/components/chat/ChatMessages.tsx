@@ -1,11 +1,7 @@
 "use client";
 
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-}
+import { SUGGESTION_CARDS } from "@/constants";
+import { Message } from "@/utils/chat";
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -28,7 +24,7 @@ export default function ChatMessages({
       <div className="max-w-4xl mx-auto px-4 py-8">
         {!hasMessages && !isLoading && (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-6 shadow-lg">
+            <div className="w-20 h-20 bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-6 shadow-lg">
               <svg
                 className="w-10 h-10 text-white"
                 fill="none"
@@ -44,26 +40,16 @@ export default function ChatMessages({
               </svg>
             </div>
             <h2 className="text-3xl font-bold text-gray-800 mb-3">
-              Welcome to WikiChatbot!
+              Chào mừng đến với WikiChatbot!
             </h2>
             <p className="text-gray-600 max-w-md mb-8">
-              Ask me anything about entrepreneurs, business strategies, or
-              startup insights. I'm here to help you learn and grow!
+              Hỏi tôi bất cứ điều gì về các danh nhân Việt Nam hay kiến thức
+              khởi nghiệp. Tôi luôn sẵn sàng giúp bạn học hỏi và phát triển!
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
-              <SuggestionCard
-                icon="💡"
-                text="What made Elon Musk successful?"
-              />
-              <SuggestionCard icon="🚀" text="How to start a tech startup?" />
-              <SuggestionCard
-                icon="📈"
-                text="Best business strategies for growth"
-              />
-              <SuggestionCard
-                icon="💼"
-                text="Lessons from successful entrepreneurs"
-              />
+              {SUGGESTION_CARDS.map((card, index) => (
+                <SuggestionCard key={index} icon={card.icon} text={card.text} />
+              ))}
             </div>
           </div>
         )}
@@ -77,7 +63,7 @@ export default function ChatMessages({
           {/* Loading Indicator */}
           {isLoading && (
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-full bg-linear-to-br from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
                 <svg
                   className="w-6 h-6 text-white"
                   fill="none"
@@ -154,10 +140,10 @@ function MessageBubble({ message }: { message: Message }) {
     >
       {/* Avatar */}
       <div
-        className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
           isUser
-            ? "bg-gradient-to-br from-gray-600 to-gray-800"
-            : "bg-gradient-to-br from-blue-500 to-purple-500"
+            ? "bg-linear-to-br from-gray-600 to-gray-800"
+            : "bg-linear-to-br from-blue-500 to-purple-500"
         }`}
       >
         {isUser ? (
@@ -195,7 +181,7 @@ function MessageBubble({ message }: { message: Message }) {
       <div
         className={`flex-1 rounded-2xl p-4 shadow-sm ${
           isUser
-            ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white"
+            ? "bg-linear-to-r from-blue-600 to-purple-600 text-white"
             : "bg-white border border-gray-100"
         }`}
       >

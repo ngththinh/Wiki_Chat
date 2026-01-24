@@ -6,22 +6,23 @@ import { useRouter } from "next/navigation";
 import { ChatSidebar, SocialLoginButtons } from "@/components/auth";
 import { InputField } from "@/components/common";
 import authService from "@/lib/authService";
+import { ROUTES, MESSAGES } from "@/constants";
+import { REGISTER_CHAT_DATA } from "@/constants/chatData";
+import {
+  validateRegisterForm,
+  type RegisterFormData,
+  type ValidationErrors,
+} from "@/utils/validation";
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RegisterFormData>({
     email: "",
     password: "",
     confirmPassword: "",
     acceptTerms: false,
   });
-  const [errors, setErrors] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-    terms: "",
-    general: "",
-  });
+  const [errors, setErrors] = useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,70 +31,19 @@ export default function RegisterScreen() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-    // Clear errors when user types
-    if (errors[name as keyof typeof errors]) {
+
+    // Clear error when user types
+    if (errors[name as keyof ValidationErrors]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  const validateForm = () => {
-    const newErrors = {
-      email: "",
-      password: "",
-      confirmPassword: "",
-      terms: "",
-      general: "",
-    };
-    let isValid = true;
-
-    // Email validation
-    if (!formData.email) {
-      newErrors.email = "Email is required";
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email";
-      isValid = false;
-    }
-
-    // Password validation
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-      isValid = false;
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-      isValid = false;
-    }
-
-    // Confirm password validation
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password";
-      isValid = false;
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-      isValid = false;
-    }
-
-    // Terms validation
-    if (!formData.acceptTerms) {
-      newErrors.terms = "You must accept the Terms of Service";
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrors({
-      email: "",
-      password: "",
-      confirmPassword: "",
-      terms: "",
-      general: "",
-    });
 
-    if (!validateForm()) {
+    const validationErrors = validateRegisterForm(formData);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
@@ -102,61 +52,26 @@ export default function RegisterScreen() {
     try {
       const response = await authService.register(
         formData.email,
-        formData.password
+        formData.password,
       );
 
       if (response.success) {
-        // Redirect to chat page
-        router.push("/chat");
+        router.push(ROUTES.CHAT);
       } else {
-        setErrors((prev) => ({
-          ...prev,
-          general: response.error || "Registration failed. Please try again.",
-        }));
+        setErrors({
+          general: response.error || MESSAGES.ERROR.REGISTER_FAILED,
+        });
       }
     } catch (error) {
-      setErrors((prev) => ({
-        ...prev,
-        general: "An unexpected error occurred. Please try again.",
-      }));
+      setErrors({ general: MESSAGES.ERROR.GENERIC_ERROR });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const chatData = {
-    title: "Learn, Discover &\nSucceed with Entrepreneurs.",
-    subtitle: "Ask about any entrepreneur...",
-    question:
-      "What traits do successful entrepreneurs like Elon Musk and Jeff Bezos share?",
-    answer: {
-      intro:
-        "Great question! World-renowned entrepreneurs share several key traits that contributed to their extraordinary success:",
-      points: [
-        {
-          title: "Visionary Thinking",
-          content:
-            "They see opportunities where others see problems. Elon Musk envisions Mars colonization, Steve Jobs revolutionized personal computing, and Jeff Bezos transformed retail.",
-        },
-        {
-          title: "Risk-Taking & Resilience",
-          content:
-            "They're not afraid to fail. All three faced major setbacks but persevered. Bezos started Amazon in a garage, Jobs was fired from Apple, Musk nearly went bankrupt in 2008.",
-        },
-        {
-          title: "Customer Obsession",
-          content:
-            'They focus intensely on creating value for customers. Bezos famously said "Start with the customer and work backwards."',
-        },
-      ],
-      conclusion:
-        "These traits helped them build world-changing companies. Discover insights from 100+ entrepreneurs in our knowledge base!",
-    },
-  };
-
   return (
     <div className="flex min-h-screen">
-      <ChatSidebar {...chatData} />
+      <ChatSidebar {...REGISTER_CHAT_DATA} />
 
       {/* Right Side - Sign Up Form */}
       <div className="flex flex-1 items-center justify-center px-8 py-12 lg:w-1/2 bg-white">
@@ -164,10 +79,10 @@ export default function RegisterScreen() {
           {/* Header */}
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold text-gray-900">
-              Sign up with free trail
+              Đăng ký miễn phí
             </h1>
             <p className="text-sm text-gray-500">
-              Empower your experience, sign up for a free account today
+              Tạo tài khoản để khám phá thế giới danh nhân Việt Nam
             </p>
           </div>
 
@@ -180,10 +95,10 @@ export default function RegisterScreen() {
             )}
 
             <InputField
-              label="Email Address"
+              label="Địa chỉ Email"
               type="email"
               name="email"
-              placeholder="ex: email@example.com"
+              placeholder="vd: email@example.com"
               value={formData.email}
               onChange={handleInputChange}
               error={errors.email}
@@ -191,10 +106,10 @@ export default function RegisterScreen() {
             />
 
             <InputField
-              label="Password"
+              label="Mật khẩu"
               type="password"
               name="password"
-              placeholder="Enter password"
+              placeholder="Nhập mật khẩu"
               value={formData.password}
               onChange={handleInputChange}
               error={errors.password}
@@ -202,10 +117,10 @@ export default function RegisterScreen() {
             />
 
             <InputField
-              label="Confirm Password"
+              label="Xác nhận mật khẩu"
               type="password"
               name="confirmPassword"
-              placeholder="Confirm password"
+              placeholder="Nhập lại mật khẩu"
               value={formData.confirmPassword}
               onChange={handleInputChange}
               error={errors.confirmPassword}
@@ -224,16 +139,16 @@ export default function RegisterScreen() {
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <label htmlFor="terms" className="text-sm text-gray-600">
-                  I agree to the{" "}
+                  Tôi đồng ý với{" "}
                   <Link href="/terms" className="text-blue-600 hover:underline">
-                    Terms of Service
+                    Điều khoản sử dụng
                   </Link>{" "}
-                  and{" "}
+                  và{" "}
                   <Link
                     href="/privacy"
                     className="text-blue-600 hover:underline"
                   >
-                    Privacy Policy
+                    Chính sách bảo mật
                   </Link>
                 </label>
               </div>
@@ -248,18 +163,18 @@ export default function RegisterScreen() {
               disabled={isLoading}
               className="w-full py-3 bg-blue-600 text-white font-medium rounded-full hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Creating account..." : "Get started free"}
+              {isLoading ? MESSAGES.LOADING.REGISTER : "Bắt đầu miễn phí"}
             </button>
 
             {/* Login Link */}
             <div className="text-center">
               <p className="text-sm text-gray-600">
-                Already have an account?{" "}
+                Đã có tài khoản?{" "}
                 <Link
-                  href="/login"
+                  href={ROUTES.LOGIN}
                   className="text-blue-600 font-medium hover:underline"
                 >
-                  Login
+                  Đăng nhập
                 </Link>
               </p>
             </div>
@@ -270,7 +185,9 @@ export default function RegisterScreen() {
                 <div className="w-full border-t border-gray-200"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">Or sign up</span>
+                <span className="px-4 bg-white text-gray-500">
+                  Hoặc đăng ký bằng
+                </span>
               </div>
             </div>
 
