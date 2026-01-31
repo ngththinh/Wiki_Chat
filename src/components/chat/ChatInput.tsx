@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, KeyboardEvent, useRef, useEffect } from "react";
-import { ChatModel } from "@/utils/subdomain";
-import { MODELS } from "@/constants";
+import { useState, KeyboardEvent, useRef, useEffect } from 'react';
+import { ChatModel } from '@/utils/subdomain';
+import { MODELS } from '@/constants';
 
 interface ChatInputProps {
   onSendMessage: (message: string, model: ChatModel) => void;
@@ -19,7 +19,7 @@ export default function ChatInput({
   onModelChange,
   isSubdomainModel = false,
 }: ChatInputProps) {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -34,228 +34,220 @@ export default function ChatInput({
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleSend = () => {
     if (message.trim() && !isLoading) {
       onSendMessage(message, selectedModel);
-      setMessage("");
+      setMessage('');
     }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
   return (
-    <div className="border-t border-gray-200 bg-white">
-      <div className="max-w-4xl mx-auto px-4 py-4">
-        <div className="relative flex items-center gap-3 bg-gray-50 rounded-full px-5 py-3 shadow-sm border border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-          {/* Model Selection Button */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="shrink-0 flex items-center gap-1 px-2 py-1.5 text-[11px] font-semibold bg-white rounded-lg border border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all shadow-sm cursor-pointer"
-              title="Select AI Model"
-            >
-              <svg
-                className="w-3 h-3 text-blue-600 group-hover:text-blue-700"
-                fill="currentColor"
-                viewBox="0 0 20 20"
+    <div className="border-t border-slate-200/50 bg-white/40 backdrop-blur-sm">
+      <div className="max-w-4xl mx-auto px-4 py-5">
+        <div className="relative">
+          {/* Glass input container */}
+          <div className="relative flex items-center gap-3 bg-white/70 backdrop-blur-sm border border-slate-200/80 px-5 py-3 focus-within:border-slate-400 focus-within:bg-white transition-all rounded-2xl shadow-sm">
+            {/* Model Selection Button - Editorial style */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="shrink-0 flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider font-medium bg-slate-100/80 border border-slate-200 hover:border-slate-400 hover:bg-white transition-all rounded-xl"
+                title="Select AI Model"
               >
-                <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z" />
-                <path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z" />
-                <path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z" />
-              </svg>
-              <span className="text-gray-700 group-hover:text-blue-700">
-                {selectedModel}
-              </span>
-              <svg
-                className={`w-2.5 h-2.5 text-gray-500 group-hover:text-blue-600 transition-transform ${
-                  isDropdownOpen ? "rotate-180" : ""
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            {/* Dropdown Menu */}
-            {isDropdownOpen && (
-              <div className="absolute bottom-full left-0 mb-2 w-36 bg-white rounded-lg shadow-xl border border-gray-200 py-1.5 z-10">
-                <div className="px-2.5 py-1.5 border-b border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
-                    Select Model
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    onModelChange(MODELS.RAG as ChatModel);
-                    setIsDropdownOpen(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-2 text-[11px] font-medium transition-colors ${
-                    selectedModel === MODELS.RAG
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                      <path
-                        fillRule="evenodd"
-                        d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <div className="flex-1">
-                      <div className="font-semibold text-[11px]">
-                        {MODELS.RAG}
-                      </div>
-                      <div className="text-[9px] text-gray-500">
-                        Retrieval Model
-                      </div>
-                    </div>
-                    {selectedModel === MODELS.RAG && (
-                      <svg
-                        className="w-3 h-3 text-blue-600"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    onModelChange(MODELS.GRAPH_RAG as ChatModel);
-                    setIsDropdownOpen(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-2 text-[11px] font-medium transition-colors ${
-                    selectedModel === MODELS.GRAPH_RAG
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-                    </svg>
-                    <div className="flex-1">
-                      <div className="font-semibold text-[11px]">
-                        {MODELS.GRAPH_RAG}
-                      </div>
-                      <div className="text-[9px] text-gray-500">
-                        Graph Model
-                      </div>
-                    </div>
-                    {selectedModel === MODELS.GRAPH_RAG && (
-                      <svg
-                        className="w-3 h-3 text-blue-600"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Input Field */}
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Bạn muốn hỏi gì về danh nhân..."
-            disabled={isLoading}
-            className="flex-1 bg-transparent border-none outline-none text-gray-800 placeholder-gray-400 text-sm disabled:opacity-50"
-          />
-
-          {/* Send Button */}
-          <button
-            onClick={handleSend}
-            disabled={!message.trim() || isLoading}
-            className="shrink-0 w-10 h-10 rounded-full bg-linear-to-r from-blue-600 to-purple-600 text-white flex items-center justify-center hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-110 shadow-md"
-          >
-            {isLoading ? (
-              <svg
-                className="w-5 h-5 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
+                <svg
+                  className="w-3 h-3 text-slate-500"
+                  fill="none"
                   stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-            ) : (
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                />
-              </svg>
-            )}
-          </button>
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
+                  />
+                </svg>
+                <span className="text-slate-600">{selectedModel}</span>
+                <svg
+                  className={`w-2.5 h-2.5 text-slate-400 transition-transform ${
+                    isDropdownOpen ? 'rotate-180' : ''
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Dropdown Menu - Editorial style */}
+              {isDropdownOpen && (
+                <div className="absolute bottom-full left-0 mb-2 w-44 bg-white/95 backdrop-blur-sm border border-slate-200/80 shadow-lg z-10 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 border-b border-slate-100">
+                    <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wider">
+                      Chọn mô hình AI
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      onModelChange(MODELS.RAG as ChatModel);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                      selectedModel === MODELS.RAG
+                        ? 'bg-slate-100 text-slate-900'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-medium">{MODELS.RAG}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Retrieval Model
+                        </div>
+                      </div>
+                      {selectedModel === MODELS.RAG && (
+                        <svg
+                          className="w-3.5 h-3.5 text-slate-700"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onModelChange(MODELS.GRAPH_RAG as ChatModel);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                      selectedModel === MODELS.GRAPH_RAG
+                        ? 'bg-slate-100 text-slate-900'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-medium">
+                          {MODELS.GRAPH_RAG}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Graph Model
+                        </div>
+                      </div>
+                      {selectedModel === MODELS.GRAPH_RAG && (
+                        <svg
+                          className="w-3.5 h-3.5 text-slate-700"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-slate-200"></div>
+
+            {/* Input Field */}
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Hỏi về danh nhân Việt Nam..."
+              disabled={isLoading}
+              className="flex-1 bg-transparent border-none outline-none text-slate-800 placeholder:text-slate-400 text-sm disabled:opacity-50"
+            />
+
+            {/* Send Button - Editorial style */}
+            <button
+              onClick={handleSend}
+              disabled={!message.trim() || isLoading}
+              className="group shrink-0 w-10 h-10 bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all rounded-xl"
+            >
+              {isLoading ? (
+                <svg
+                  className="w-4 h-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              ) : (
+                <svg
+                  className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Helper Text */}
-        <p className="text-xs text-gray-400 text-center mt-3">
-          Press{" "}
-          <kbd className="px-2 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">
-            Enter
-          </kbd>{" "}
-          to send • AI-powered entrepreneurial insights
-        </p>
+        {/* Helper Text - Editorial style */}
+        <div className="flex items-center justify-center gap-4 mt-3">
+          <div className="flex items-center gap-2 text-[10px] text-slate-400">
+            <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-500 font-mono text-[9px] rounded-md">
+              Enter
+            </kbd>
+            <span>để gửi</span>
+          </div>
+          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+          <span className="text-[10px] text-slate-400 italic">
+            Trí tuệ nhân tạo về danh nhân Việt Nam
+          </span>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { SUGGESTION_CARDS } from "@/constants";
-import { Message } from "@/utils/chat";
+import { SUGGESTION_CARDS } from '@/constants';
+import { Message } from '@/utils/chat';
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -17,36 +17,56 @@ export default function ChatMessages({
   const hasMessages = messages.length > 0;
   const lastMessage = messages[messages.length - 1];
   const showRegenerateButton =
-    hasMessages && lastMessage?.role === "assistant" && !isLoading;
+    hasMessages && lastMessage?.role === 'assistant' && !isLoading;
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {!hasMessages && !isLoading && (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <div className="w-20 h-20 bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-6 shadow-lg">
-              <svg
-                className="w-10 h-10 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                />
-              </svg>
+            {/* Editorial Welcome Icon */}
+            <div className="relative mb-8">
+              <div className="w-20 h-20 border border-slate-300 rounded-2xl"></div>
+              <div className="absolute inset-2 bg-slate-100/50 backdrop-blur-sm rounded-xl"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg
+                  className="w-8 h-8 text-slate-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+                  />
+                </svg>
+              </div>
             </div>
-            <h2 className="text-3xl font-bold text-gray-800 mb-3">
-              Chào mừng đến với WikiChatbot!
+
+            {/* Editorial Header */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-px bg-slate-300"></div>
+              <span className="text-[10px] text-slate-400 uppercase tracking-[0.3em]">
+                Bắt đầu cuộc trò chuyện
+              </span>
+              <div className="w-12 h-px bg-slate-300"></div>
+            </div>
+
+            <h2 className="text-3xl font-serif font-bold text-slate-800 mb-3">
+              Chào mừng đến với WikiChatbot
             </h2>
-            <p className="text-gray-600 max-w-md mb-8">
-              Hỏi tôi bất cứ điều gì về các danh nhân Việt Nam hay kiến thức
-              khởi nghiệp. Tôi luôn sẵn sàng giúp bạn học hỏi và phát triển!
+            <p className="text-slate-500 max-w-md mb-10 text-sm leading-relaxed">
+              Hỏi tôi bất cứ điều gì về các danh nhân Việt Nam.
+              <br />
+              <span className="italic">
+                Tôi luôn sẵn sàng giúp bạn khám phá lịch sử và tri thức.
+              </span>
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
+
+            {/* Suggestion Cards - Editorial style */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
               {SUGGESTION_CARDS.map((card, index) => (
                 <SuggestionCard key={index} icon={card.icon} text={card.text} />
               ))}
@@ -60,56 +80,54 @@ export default function ChatMessages({
             <MessageBubble key={message.id} message={message} />
           ))}
 
-          {/* Loading Indicator */}
+          {/* Loading Indicator - Editorial style */}
           {isLoading && (
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-linear-to-br from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                  />
-                </svg>
+            <div className="flex items-start gap-4">
+              <div className="relative shrink-0">
+                <div className="w-10 h-10 border border-slate-300 rounded-xl"></div>
+                <div className="absolute inset-1.5 bg-slate-100/50 rounded-lg"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs font-serif text-slate-600">AI</span>
+                </div>
               </div>
-              <div className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-                <div className="flex gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce delay-100"></div>
-                  <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce delay-200"></div>
+              <div className="flex-1 bg-white/60 backdrop-blur-sm border border-slate-200/80 p-5 rounded-2xl shadow-sm">
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                  <div
+                    className="w-2 h-2 bg-slate-500 rounded-full animate-bounce"
+                    style={{ animationDelay: '0.1s' }}
+                  ></div>
+                  <div
+                    className="w-2 h-2 bg-slate-600 rounded-full animate-bounce"
+                    style={{ animationDelay: '0.2s' }}
+                  ></div>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Regenerate Button */}
+        {/* Regenerate Button - Editorial style */}
         {showRegenerateButton && (
-          <div className="flex justify-center mt-6">
+          <div className="flex justify-center mt-8">
             <button
               onClick={onRegenerate}
-              className="flex items-center gap-2 px-6 py-2.5 bg-white border-2 border-blue-500 text-blue-600 rounded-full hover:bg-blue-50 transition-colors font-medium shadow-sm"
+              className="group flex items-center gap-2 px-5 py-2.5 bg-white/60 backdrop-blur-sm border border-slate-300 text-slate-600 hover:bg-white hover:border-slate-400 transition-all text-sm rounded-xl shadow-sm"
             >
               <svg
-                className="w-4 h-4"
+                className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                strokeWidth={1.5}
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
                 />
               </svg>
-              Regenerate response
+              <span className="tracking-wide">Tạo lại phản hồi</span>
             </button>
           </div>
         )}
@@ -118,90 +136,107 @@ export default function ChatMessages({
   );
 }
 
-// Suggestion Card Component
+// Suggestion Card Component - Editorial style
 function SuggestionCard({ icon, text }: { icon: string; text: string }) {
   return (
-    <button className="flex items-center gap-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:shadow-md transition-all text-left group">
-      <span className="text-2xl">{icon}</span>
-      <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium">
-        {text}
-      </span>
+    <button className="group relative overflow-hidden text-left rounded-xl">
+      {/* Glass background */}
+      <div className="absolute inset-0 bg-white/50 backdrop-blur-sm border border-slate-200/80 group-hover:border-slate-400 group-hover:bg-white/80 transition-all rounded-xl shadow-sm"></div>
+
+      <div className="relative flex items-center gap-4 p-4">
+        <span className="text-xl opacity-60 group-hover:opacity-100 transition-opacity">
+          {icon}
+        </span>
+        <span className="text-sm text-slate-600 group-hover:text-slate-800 transition-colors leading-snug">
+          {text}
+        </span>
+      </div>
     </button>
   );
 }
 
-// Message Bubble Component
+// Message Bubble Component - Editorial style
 function MessageBubble({ message }: { message: Message }) {
-  const isUser = message.role === "user";
+  const isUser = message.role === 'user';
 
   return (
     <div
-      className={`flex items-start gap-3 ${isUser ? "flex-row-reverse" : ""}`}
+      className={`flex items-start gap-4 ${isUser ? 'flex-row-reverse' : ''}`}
     >
-      {/* Avatar */}
-      <div
-        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-          isUser
-            ? "bg-linear-to-br from-gray-600 to-gray-800"
-            : "bg-linear-to-br from-blue-500 to-purple-500"
-        }`}
-      >
-        {isUser ? (
-          <svg
-            className="w-6 h-6 text-white"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-            />
-          </svg>
-        ) : (
-          <svg
-            className="w-6 h-6 text-white"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-            />
-          </svg>
+      {/* Avatar - Editorial square style */}
+      <div className="relative shrink-0">
+        <div
+          className={`w-10 h-10 border rounded-xl ${isUser ? 'border-slate-400 bg-slate-800' : 'border-slate-300'}`}
+        ></div>
+        {!isUser && (
+          <div className="absolute inset-1.5 bg-slate-100/50 rounded-lg"></div>
         )}
+        <div className="absolute inset-0 flex items-center justify-center">
+          {isUser ? (
+            <svg
+              className="w-5 h-5 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+              />
+            </svg>
+          ) : (
+            <span className="text-xs font-serif text-slate-600">AI</span>
+          )}
+        </div>
       </div>
 
-      {/* Message Content */}
+      {/* Message Content - Editorial style */}
       <div
-        className={`flex-1 rounded-2xl p-4 shadow-sm ${
+        className={`flex-1 p-5 rounded-2xl shadow-sm ${
           isUser
-            ? "bg-linear-to-r from-blue-600 to-purple-600 text-white"
-            : "bg-white border border-gray-100"
+            ? 'bg-slate-800 text-white'
+            : 'bg-white/60 backdrop-blur-sm border border-slate-200/80'
         }`}
       >
         <p
           className={`text-sm leading-relaxed ${
-            isUser ? "text-white" : "text-gray-800"
+            isUser ? 'text-white/90' : 'text-slate-700'
           }`}
         >
           {message.content}
         </p>
-        <span
-          className={`text-xs mt-2 block ${
-            isUser ? "text-blue-100" : "text-gray-400"
+        <div
+          className={`flex items-center gap-2 mt-3 pt-3 border-t ${
+            isUser ? 'border-slate-700' : 'border-slate-100'
           }`}
         >
-          {new Date(message.timestamp).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
+          <span
+            className={`text-[10px] uppercase tracking-wider ${
+              isUser ? 'text-slate-400' : 'text-slate-400'
+            }`}
+          >
+            {new Date(message.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+          {message.model && (
+            <>
+              <span
+                className={`w-1 h-1 rounded-full ${isUser ? 'bg-slate-600' : 'bg-slate-300'}`}
+              ></span>
+              <span
+                className={`text-[10px] uppercase tracking-wider ${
+                  isUser ? 'text-slate-400' : 'text-slate-400'
+                }`}
+              >
+                {message.model}
+              </span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
