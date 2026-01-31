@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -8,6 +8,7 @@ interface ConfirmModalProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
+  variant?: "default" | "danger";
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -16,32 +17,33 @@ export default function ConfirmModal({
   isOpen,
   title,
   message,
-  confirmText = 'OK',
-  cancelText = 'Cancel',
+  confirmText = "OK",
+  cancelText = "Cancel",
+  variant = "default",
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [isOpen]);
 
   // Close on ESC key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === "Escape" && isOpen) {
         onCancel();
       }
     };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
   }, [isOpen, onCancel]);
 
   if (!isOpen) return null;
@@ -55,18 +57,47 @@ export default function ConfirmModal({
       />
 
       {/* Modal - Editorial style */}
-      <div className="relative bg-white shadow-2xl max-w-md w-full mx-4 transform transition-all animate-scale-in">
+      <div className="relative bg-white shadow-2xl max-w-md w-full mx-4 transform transition-all animate-scale-in rounded-lg overflow-hidden">
         {/* Header decoration */}
-        <div className="h-1 bg-gradient-to-r from-slate-300 via-slate-400 to-slate-300"></div>
+        <div
+          className={`h-1 ${variant === "danger" ? "bg-gradient-to-r from-red-300 via-red-500 to-red-300" : "bg-gradient-to-r from-slate-300 via-slate-400 to-slate-300"}`}
+        ></div>
 
         <div className="p-8">
+          {/* Warning Icon for danger variant */}
+          {variant === "danger" && (
+            <div className="flex justify-center mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <svg
+                  className="w-6 h-6 text-red-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+            </div>
+          )}
+
           {/* Title */}
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-8 h-px bg-slate-300"></div>
-            <h3 className="text-lg font-serif font-bold text-slate-900 tracking-tight">
+            <div
+              className={`w-8 h-px ${variant === "danger" ? "bg-red-200" : "bg-slate-300"}`}
+            ></div>
+            <h3
+              className={`text-lg font-serif font-bold tracking-tight ${variant === "danger" ? "text-red-600" : "text-slate-900"}`}
+            >
               {title}
             </h3>
-            <div className="w-8 h-px bg-slate-300"></div>
+            <div
+              className={`w-8 h-px ${variant === "danger" ? "bg-red-200" : "bg-slate-300"}`}
+            ></div>
           </div>
 
           {/* Message */}
@@ -78,13 +109,17 @@ export default function ConfirmModal({
           <div className="flex gap-3">
             <button
               onClick={onCancel}
-              className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-medium hover:bg-slate-200 transition-colors text-sm tracking-wide border border-slate-200"
+              className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-medium hover:bg-slate-200 transition-colors text-sm tracking-wide border border-slate-200 rounded-lg"
             >
               {cancelText}
             </button>
             <button
               onClick={onConfirm}
-              className="flex-1 px-4 py-3 bg-slate-900 text-white font-medium hover:bg-slate-700 transition-colors text-sm tracking-wide"
+              className={`flex-1 px-4 py-3 font-medium transition-colors text-sm tracking-wide rounded-lg ${
+                variant === "danger"
+                  ? "bg-red-500 text-white hover:bg-red-600"
+                  : "bg-slate-900 text-white hover:bg-slate-700"
+              }`}
             >
               {confirmText}
             </button>

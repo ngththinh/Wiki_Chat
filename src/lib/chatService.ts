@@ -1,104 +1,316 @@
 import { apiClient, ApiResponse } from './apiClient';
 
-// Chat API Types
+// =====================
+// Backend API Types (matching Swagger)
+// =====================
+
+// ChatRequest - POST /api/Question
+export interface ChatRequest {
+  question: string;
+  documentIds?: string[];
+  verbose?: boolean;
+}
+
+// ChatResponse - response from /api/Question
+export interface ChatResponse {
+  question: string;
+  answer: string;
+  metadata?: Record<string, unknown>;
+}
+
+// SearchRequest - POST /api/Question/search
+export interface SearchRequest {
+  query: string;
+  topK?: number;
+  documentIds?: string[];
+  searchType?: string;
+  bm25Weight?: number;
+  semanticWeight?: number;
+}
+
+// SearchResult from backend
+export interface SearchResult {
+  id: number;
+  content: string;
+  score: number;
+  h1?: string;
+  h2?: string;
+  h3?: string;
+  documentId?: string;
+  chunkIndex?: number;
+  metadata?: Record<string, unknown>;
+}
+
+// SearchResponse
+export interface SearchResponse {
+  query: string;
+  results: SearchResult[];
+  total: number;
+  searchType?: string;
+}
+
+// DocumentInfo
+export interface DocumentInfo {
+  id: string;
+  filePath?: string;
+  fileName?: string;
+  sourceType?: string;
+  status?: string;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+  chunkCount?: number;
+}
+
+// DocumentUploadResponse
+export interface DocumentUploadResponse {
+  totalFiles: number;
+  results: FileUploadResult[];
+}
+
+export interface FileUploadResult {
+  filename?: string;
+  status?: string;
+  jobId?: string;
+  documentId?: string;
+  message?: string;
+}
+
+// JobStatusResponse
+export interface JobStatusResponse {
+  jobId?: string;
+  status?: string;
+  message?: string;
+  documentId?: string;
+  progress?: Record<string, unknown>;
+}
+
+// =====================
+// UI Message Types (for frontend use)
+// =====================
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  metadata?: Record<string, unknown>;
 }
 
-export interface ChatRequest {
-  message: string;
-  conversationId?: string;
-}
-
-export interface ChatResponse {
-  message: Message;
-  conversationId: string;
-}
-
-export interface RegenerateRequest {
-  conversationId: string;
-  messageId: string;
-}
-
-// Chat Service
+// =====================
+// Chat Service - matching Backend API
+// =====================
 export const chatService = {
-  // Send message to AI
-  async sendMessage(message: string, conversationId?: string): Promise<ApiResponse<ChatResponse>> {
-    return apiClient.post<ChatResponse>('/chat/message', {
-      message,
-      conversationId,
-    });
+  // Send question to AI - POST /api/Question
+  async sendQuestion(question: string, documentIds?: string[], verbose?: boolean): Promise<ApiResponse<ChatResponse>> {
+    const request: ChatRequest = {
+      question,
+      documentIds,
+      verbose,
+    };
+    return apiClient.post<ChatResponse>('/Question', request);
   },
 
-  // Regenerate AI response
-  async regenerateResponse(conversationId: string, messageId: string): Promise<ApiResponse<ChatResponse>> {
-    return apiClient.post<ChatResponse>('/chat/regenerate', {
-      conversationId,
-      messageId,
-    });
+  // Search in documents - POST /api/Question/search
+  async search(query: string, options?: Partial<SearchRequest>): Promise<ApiResponse<SearchResponse>> {
+    const request: SearchRequest = {
+      query,
+      ...options,
+    };
+    return apiClient.post<SearchResponse>('/Question/search', request);
   },
 
-  // Get conversation messages
-  async getConversationMessages(conversationId: string): Promise<ApiResponse<{ messages: Message[] }>> {
-    return apiClient.get<{ messages: Message[] }>(`/chat/conversations/${conversationId}/messages`);
+  // Upload document - POST /api/Question/upload
+  async uploadDocument(file: File, chunkSize?: number, chunkOverlap?: number): Promise<ApiResponse<DocumentUploadResponse>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const params = new URLSearchParams();
+    if (chunkSize) params.append('chunkSize', chunkSize.toString());
+    if (chunkOverlap) params.append('chunkOverlap', chunkOverlap.toString());
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://sep490-8-wikichatbot-backends.onrender.com/api';
+      const response = await fetch(`${API_BASE_URL}/Question/upload${queryString}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || data.detail || 'Upload failed',
+        };
+      }
+
+      return {
+        success: true,
+        data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Lỗi upload file',
+      };
+    }
+  },
+
+  // Get all documents - GET /api/Question/documents
+  async getDocuments(skip?: number, limit?: number): Promise<ApiResponse<DocumentInfo[]>> {
+    const params = new URLSearchParams();
+    if (skip !== undefined) params.append('skip', skip.toString());
+    if (limit !== undefined) params.append('limit', limit.toString());
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return apiClient.get<DocumentInfo[]>(`/Question/documents${queryString}`);
+  },
+
+  // Get document by ID - GET /api/Question/documents/{documentId}
+  async getDocument(documentId: string): Promise<ApiResponse<DocumentInfo>> {
+    return apiClient.get<DocumentInfo>(`/Question/documents/${documentId}`);
+  },
+
+  // Delete document - DELETE /api/Question/documents/{documentId}
+  async deleteDocument(documentId: string): Promise<ApiResponse<void>> {
+    return apiClient.delete<void>(`/Question/documents/${documentId}`);
+  },
+
+  // Get job status - GET /api/Question/status/{jobId}
+  async getJobStatus(jobId: string): Promise<ApiResponse<JobStatusResponse>> {
+    return apiClient.get<JobStatusResponse>(`/Question/status/${jobId}`);
+  },
+
+  // Health check - GET /api/Question/health
+  async healthCheck(): Promise<ApiResponse<void>> {
+    return apiClient.get<void>('/Question/health');
   },
 };
 
+// =====================
 // Mock Chat Service (for development)
+// =====================
 export const mockChatService = {
-  async sendMessage(message: string, conversationId?: string): Promise<ApiResponse<ChatResponse>> {
+  async sendQuestion(question: string, documentIds?: string[], verbose?: boolean): Promise<ApiResponse<ChatResponse>> {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    const aiMessage: Message = {
-      id: `msg-${Date.now()}`,
-      role: 'assistant',
-      content: `This is a mock response to: "${message}". In production, this will be replaced with actual AI responses from the backend.`,
-      timestamp: new Date(),
-    };
-
     return {
       success: true,
       data: {
-        message: aiMessage,
-        conversationId: conversationId || `conv-${Date.now()}`,
+        question,
+        answer: `Đây là câu trả lời mẫu cho câu hỏi: "${question}". Trong môi trường production, câu trả lời sẽ được tạo bởi AI từ backend.`,
+        metadata: verbose ? { source: 'mock', timestamp: new Date().toISOString() } : undefined,
       },
     };
   },
 
-  async regenerateResponse(conversationId: string, messageId: string): Promise<ApiResponse<ChatResponse>> {
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const aiMessage: Message = {
-      id: `msg-${Date.now()}`,
-      role: 'assistant',
-      content: 'This is a regenerated mock response. The actual implementation will call the backend API.',
-      timestamp: new Date(),
-    };
+  async search(query: string, options?: Partial<SearchRequest>): Promise<ApiResponse<SearchResponse>> {
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     return {
       success: true,
       data: {
-        message: aiMessage,
-        conversationId,
+        query,
+        results: [
+          {
+            id: 1,
+            content: `Kết quả tìm kiếm mẫu cho: "${query}"`,
+            score: 0.95,
+            h1: 'Tiêu đề mẫu',
+            documentId: 'doc-1',
+            chunkIndex: 0,
+          },
+        ],
+        total: 1,
+        searchType: options?.searchType || 'hybrid',
       },
     };
   },
 
-  async getConversationMessages(conversationId: string): Promise<ApiResponse<{ messages: Message[] }>> {
+  async uploadDocument(file: File): Promise<ApiResponse<DocumentUploadResponse>> {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    return {
+      success: true,
+      data: {
+        totalFiles: 1,
+        results: [
+          {
+            filename: file.name,
+            status: 'completed',
+            documentId: `doc-${Date.now()}`,
+            message: 'Upload thành công',
+          },
+        ],
+      },
+    };
+  },
+
+  async getDocuments(): Promise<ApiResponse<DocumentInfo[]>> {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     return {
       success: true,
+      data: [
+        {
+          id: 'doc-1',
+          fileName: 'document-sample.pdf',
+          status: 'processed',
+          createdAt: new Date().toISOString(),
+          chunkCount: 10,
+        },
+      ],
+    };
+  },
+
+  async getDocument(documentId: string): Promise<ApiResponse<DocumentInfo>> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    return {
+      success: true,
       data: {
-        messages: [],
+        id: documentId,
+        fileName: 'document-sample.pdf',
+        status: 'processed',
+        createdAt: new Date().toISOString(),
+        chunkCount: 10,
       },
     };
+  },
+
+  async deleteDocument(documentId: string): Promise<ApiResponse<void>> {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return { success: true };
+  },
+
+  async getJobStatus(jobId: string): Promise<ApiResponse<JobStatusResponse>> {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return {
+      success: true,
+      data: {
+        jobId,
+        status: 'completed',
+        message: 'Processing completed',
+      },
+    };
+  },
+
+  async healthCheck(): Promise<ApiResponse<void>> {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return { success: true };
   },
 };
 
 // Export service to use (switch between real and mock)
-export default mockChatService;
+// Use chatService for production with backend
+// Use mockChatService for development/testing
+export default chatService;

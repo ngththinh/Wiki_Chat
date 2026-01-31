@@ -1,7 +1,4 @@
-// API Client Configuration
-// Frontend Next.js: http://localhost:3000
-// Backend API: http://localhost:8000 (default, hoặc set NEXT_PUBLIC_API_BASE_URL)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://sep490-8-wikichatbot-backends.onrender.com/api';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -10,7 +7,6 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
-// API Client with auth token
 export const apiClient = {
   async request<T>(
     endpoint: string,
@@ -25,7 +21,7 @@ export const apiClient = {
       };
 
       if (token) {
-        // headers['Authorization'] = `Bearer ${token}`;
+        (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
       }
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -33,23 +29,32 @@ export const apiClient = {
         headers,
       });
 
-      const data = await response.json();
+      // Handle 204 No Content
+      if (response.status === 204 || response.status === 200 && response.headers.get('content-length') === '0') {
+        return { success: true, data: undefined };
+      }
+
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const text = await response.text();
+        if (text) {
+          data = JSON.parse(text);
+        }
+      }
 
       if (!response.ok) {
         return {
           success: false,
-          error: data.message || data.error || 'Request failed',
+          error: data?.message || data?.detail || data?.error || `Request failed with status ${response.status}`,
         };
       }
 
-      return {
-        success: true,
-        data,
-      };
+      return { success: true, data };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Network error',
+        error: error instanceof Error ? error.message : 'Lỗi kết nối mạng',
       };
     }
   },

@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import authService from "@/lib/authService";
+import historyService from "@/lib/historyService";
 import { ROUTES } from "@/constants";
+import ConfirmModal from "@/components/common/ConfirmModal";
 
 interface ChatSidebarNavProps {
   user: any;
   isGuest?: boolean;
   onNewChat: () => void;
+  onSelectChat?: (sessionId: string) => void;
   currentChat: string | null;
+  refreshTrigger?: number;
 }
 
 interface Conversation {
@@ -23,62 +26,50 @@ export default function ChatSidebarNav({
   user,
   isGuest = false,
   onNewChat,
+  onSelectChat,
   currentChat,
+  refreshTrigger = 0,
 }: ChatSidebarNavProps) {
-  const router = useRouter();
-  const [showSettings, setShowSettings] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [pinnedConversations, setPinnedConversations] = useState<string[]>([]);
-  const [conversationsData, setConversationsData] = useState<Conversation[]>([
-    {
-      id: "1",
-      title: "Create html game environment f...",
-      timestamp: new Date(2026, 0, 15, 10, 30),
-      pinned: false,
-    },
-    {
-      id: "2",
-      title: "Lorem Ipsum Project",
-      timestamp: new Date(2026, 0, 15, 9, 15),
-      pinned: false,
-    },
-    {
-      id: "3",
-      title: "Lorem Project...",
-      timestamp: new Date(2026, 0, 14, 16, 45),
-      pinned: false,
-    },
-    {
-      id: "4",
-      title: "Crypto Lending App",
-      timestamp: new Date(2026, 0, 13, 14, 20),
-      pinned: false,
-    },
-    {
-      id: "5",
-      title: "Operator Grammar Types",
-      timestamp: new Date(2026, 0, 12, 11, 10),
-      pinned: false,
-    },
-    {
-      id: "6",
-      title: "Min States For Binary DFA",
-      timestamp: new Date(2026, 0, 11, 15, 30),
-      pinned: false,
-    },
-    {
-      id: "7",
-      title: "Lorem POS system",
-      timestamp: new Date(2026, 0, 10, 9, 45),
-      pinned: false,
-    },
-  ]);
+  const [conversationsData, setConversationsData] = useState<Conversation[]>(
+    [],
+  );
+  const [isLoading, setIsLoading] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close menu when clicking outside
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [clearAllModalOpen, setClearAllModalOpen] = useState(false);
+
+  // Fetch conversations from API
+  useEffect(() => {
+    const fetchConversations = async () => {
+      if (isGuest) {
+        setConversationsData([]);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const response = await historyService.getConversations();
+        if (response.success && response.data) {
+          setConversationsData(response.data.conversations);
+        }
+      } catch (error) {
+        // Error fetching conversations
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchConversations();
+  }, [isGuest, refreshTrigger]); // Thêm refreshTrigger để refresh khi có thay đổi
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -107,7 +98,6 @@ export default function ChatSidebarNav({
     }
   };
 
-  // Update conversations with pinned status
   const allConversationsData: Conversation[] = conversationsData.map(
     (conv) => ({
       ...conv,
@@ -115,7 +105,6 @@ export default function ChatSidebarNav({
     }),
   );
 
-  // Sort: pinned first, then by timestamp (newest first)
   const conversations = [...allConversationsData].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
@@ -124,9 +113,7 @@ export default function ChatSidebarNav({
 
   const handleLogout = () => {
     authService.logout();
-    // Clear guest messages from localStorage on logout
     localStorage.removeItem("guestChatMessages");
-    // Force reload to reset to clean guest state
     window.location.href = ROUTES.CHAT;
   };
 
@@ -136,31 +123,73 @@ export default function ChatSidebarNav({
     setActiveMenu(null);
   };
 
-  const handleSaveRename = (id: string) => {
+  const handleSaveRename = async (id: string) => {
     if (editTitle.trim()) {
-      setConversationsData((prev) =>
-        prev.map((conv) =>
-          conv.id === id ? { ...conv, title: editTitle.trim() } : conv,
-        ),
-      );
-      // TODO: Call API to save to backend
-      console.log("Renamed conversation", id, "to", editTitle);
+      try {
+        const response = await historyService.renameConversation(
+          id,
+          editTitle.trim(),
+        );
+        if (response.success) {
+          setConversationsData((prev) =>
+            prev.map((conv) =>
+              conv.id === id ? { ...conv, title: editTitle.trim() } : conv,
+            ),
+          );
+        }
+      } catch (error) {
+        // Error renaming
+      }
     }
     setEditingId(null);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Bạn có chắc muốn xóa đoạn chat này?")) {
-      setConversationsData((prev) => prev.filter((conv) => conv.id !== id));
-      setPinnedConversations((prev) => prev.filter((convId) => convId !== id));
-      // TODO: Call API to delete from backend
-      console.log("Deleted conversation", id);
-      setActiveMenu(null);
+  // Open delete confirmation modal
+  const openDeleteModal = (id: string) => {
+    setDeleteTargetId(id);
+    setDeleteModalOpen(true);
+    setActiveMenu(null);
+  };
+
+  // Confirm delete action
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId) return;
+
+    try {
+      await historyService.deleteConversation(deleteTargetId);
+      setConversationsData((prev) =>
+        prev.filter((conv) => conv.id !== deleteTargetId),
+      );
+      setPinnedConversations((prev) =>
+        prev.filter((convId) => convId !== deleteTargetId),
+      );
+    } catch (error) {
+      // Error deleting
+    } finally {
+      setDeleteModalOpen(false);
+      setDeleteTargetId(null);
+    }
+  };
+
+  // Open clear all confirmation modal
+  const openClearAllModal = () => {
+    setClearAllModalOpen(true);
+  };
+
+  const handleConfirmClearAll = async () => {
+    try {
+      await historyService.clearAllSessions();
+      setConversationsData([]);
+      setPinnedConversations([]);
+    } catch (error) {
+      // Error clearing
+    } finally {
+      setClearAllModalOpen(false);
     }
   };
 
   const handlePin = (id: string) => {
-    // TODO: Call API to pin/unpin
+    // Note: Backend doesn't support pin feature, this is local only
     setPinnedConversations((prev) => {
       if (prev.includes(id)) {
         return prev.filter((convId) => convId !== id);
@@ -168,222 +197,248 @@ export default function ChatSidebarNav({
         return [...prev, id];
       }
     });
-    console.log("Pin/Unpin conversation", id);
     setActiveMenu(null);
   };
 
   return (
-    <div className="w-64 bg-linear-to-b from-gray-50 to-white border-r border-gray-200 flex flex-col overflow-visible">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
+    <div className="w-72 relative flex flex-col overflow-visible">
+      {/* Background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, #1e293b 0%, #0f172a 50%, #020617 100%)",
+        }}
+      />
+
+      {/* Grid pattern */}
+      <div
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, #475569 1px, transparent 1px),
+            linear-gradient(to bottom, #475569 1px, transparent 1px)
+          `,
+          backgroundSize: "40px 40px",
+        }}
+      />
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Header */}
+        <div className="p-5 border-b border-white/8">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="relative">
+              <div className="w-9 h-9 border border-white/15 rounded-lg" />
+              <div className="absolute inset-1.5 bg-white/5 rounded" />
+              <span className="absolute inset-0 flex items-center justify-center text-sm font-serif font-medium text-white/80">
+                W
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-serif font-medium text-white/90 tracking-wide">
+                WikiChatbot
+              </span>
+              <span className="text-[9px] text-white/35 uppercase tracking-[0.15em]">
+                Danh nhân Việt Nam
+              </span>
+            </div>
           </div>
-          <span className="font-bold text-gray-800 text-lg">NAME</span>
-        </div>
 
-        {/* New Chat & Search */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onNewChat}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-linear-to-r from-blue-600 to-purple-600 text-white rounded-full hover:from-blue-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg font-medium"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          {/* New Chat & Search - Bo tròn nhẹ */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onNewChat}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/10 border border-white/15 text-white/90 hover:bg-white/15 hover:border-white/25 transition-all text-sm font-medium tracking-wide rounded-lg"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Trò chuyện mới
-          </button>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Trò chuyện mới
+            </button>
 
-          <button className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center hover:bg-purple-200 transition-colors shrink-0">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Conversations List */}
-      <div className="flex-1 overflow-y-auto overflow-x-visible p-4">
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Lịch sử trò chuyện
-            </h3>
-            <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">
-              Xóa tất cả
+            <button className="w-11 h-11 border border-white/15 text-white/50 flex items-center justify-center hover:bg-white/10 hover:text-white/80 transition-colors rounded-lg">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
             </button>
           </div>
-          <div className="space-y-1">
-            {conversations.map((conv) => (
-              <div key={conv.id} className="relative group">
-                <button
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                    currentChat === conv.id
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 pr-8">
-                    <svg
-                      className="w-4 h-4 shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                      />
-                    </svg>
-                    {editingId === conv.id ? (
-                      <input
-                        type="text"
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        onBlur={() => handleSaveRename(conv.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSaveRename(conv.id);
-                          if (e.key === "Escape") setEditingId(null);
-                        }}
-                        className="flex-1 bg-white border border-blue-400 rounded px-2 py-0.5 text-sm focus:outline-none"
-                        autoFocus
-                      />
-                    ) : (
-                      <span className="truncate flex-1">{conv.title}</span>
-                    )}
-                    {conv.pinned && (
-                      <svg
-                        className="w-3.5 h-3.5 text-blue-600 shrink-0"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M5 5a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 19V5z" />
-                      </svg>
-                    )}
-                  </div>
-                </button>
+        </div>
 
-                {/* Menu 3 chấm */}
-                <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                  <button
-                    onClick={(e) => handleMenuToggle(conv.id, e)}
-                    className="w-6 h-6 rounded hover:bg-gray-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-600"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                    </svg>
-                  </button>
-                </div>
+        {/* Conversations List */}
+        <div className="flex-1 overflow-y-auto overflow-x-visible px-4 py-3">
+          <div>
+            <div className="flex items-center justify-between mb-4 px-1">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-px bg-white/15" />
+                <h3 className="text-[10px] font-medium text-white/35 uppercase tracking-[0.2em]">
+                  Lịch sử
+                </h3>
               </div>
-            ))}
+              {conversationsData.length > 0 && (
+                <button
+                  onClick={openClearAllModal}
+                  className="text-[10px] text-white/25 hover:text-white/50 uppercase tracking-wider transition-colors"
+                >
+                  Xóa tất cả
+                </button>
+              )}
+            </div>
+
+            {/* Loading state */}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-[11px] text-white/30 italic">
+                  Chưa có lịch sử trò chuyện
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {conversations.map((conv) => (
+                  <div key={conv.id} className="relative group">
+                    <button
+                      onClick={() => onSelectChat?.(conv.id)}
+                      className={`w-full text-left px-3 py-2.5 text-sm transition-all rounded-lg ${
+                        currentChat === conv.id
+                          ? "bg-white/8 text-white/85 border border-white/10"
+                          : "text-white/50 hover:bg-white/5 hover:text-white/70 border border-transparent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 pr-8">
+                        <svg
+                          className="w-4 h-4 shrink-0 opacity-30"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+                          />
+                        </svg>
+                        {editingId === conv.id ? (
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            onBlur={() => handleSaveRename(conv.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSaveRename(conv.id);
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            className="flex-1 bg-white/10 border border-white/20 px-2 py-0.5 text-sm text-white focus:outline-none rounded"
+                            autoFocus
+                          />
+                        ) : (
+                          <span className="truncate flex-1 font-light">
+                            {conv.title}
+                          </span>
+                        )}
+                        {conv.pinned && (
+                          <svg
+                            className="w-3 h-3 text-white/35 shrink-0"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M5 5a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 19V5z" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Menu dots - Bo tròn */}
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <button
+                        onClick={(e) => handleMenuToggle(conv.id, e)}
+                        className="w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white/35 hover:text-white/60 hover:bg-white/10 rounded"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer - User Profile Only (No Settings) */}
+        <div className="p-4 border-t border-white/8">
+          {/* Logged In User - Bo tròn nhẹ */}
+          <div className="flex items-center gap-3 px-3 py-3 bg-white/5 border border-white/8 rounded-lg">
+            <div className="w-9 h-9 bg-slate-600/80 flex items-center justify-center text-white/80 font-serif text-sm rounded-lg">
+              {user?.fullName?.[0]?.toUpperCase() ||
+                user?.username?.[0]?.toUpperCase() ||
+                user?.email?.[0]?.toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-white/85 truncate font-medium">
+                {user?.fullName || user?.username || user?.email?.split("@")[0]}
+              </p>
+              <p className="text-[10px] text-white/35 truncate">
+                {user?.email}
+              </p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-8 h-8 border border-white/10 hover:border-white/20 hover:bg-white/5 flex items-center justify-center text-white/35 hover:text-white/60 transition-all rounded-lg"
+              title="Đăng xuất"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"
+                />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Footer - User Profile & Settings */}
-      <div className="p-4 border-t border-gray-200 space-y-2">
-        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors text-left">
-          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-          </div>
-          <span className="text-sm font-medium text-gray-700">Cài đặt</span>
-        </button>
-
-        {/* Logged In User */}
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50">
-          <div className="w-8 h-8 rounded-full bg-linear-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-sm">
-            {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">
-              {user?.name || user?.email?.split("@")[0]}
-            </p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center hover:bg-purple-200 transition-colors"
-            title="Logout"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Global Dropdown Menu */}
+      {/* Global Dropdown Menu - Bo tròn */}
       {activeMenu && (
         <div
           ref={menuRef}
-          className="fixed w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-9999"
+          className="fixed w-44 bg-slate-800/95 backdrop-blur-sm border border-white/10 py-1.5 z-[9999] shadow-xl rounded-lg"
           style={{
             top: `${menuPosition.top}px`,
             left: `${menuPosition.left}px`,
@@ -396,60 +451,96 @@ export default function ChatSidebarNav({
               );
               if (conv && activeMenu) handleRename(activeMenu, conv.title);
             }}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2.5 text-left text-sm text-white/60 hover:bg-white/8 hover:text-white/85 flex items-center gap-3 transition-colors mx-1 rounded-md"
+            style={{ width: "calc(100% - 8px)" }}
           >
             <svg
               className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              strokeWidth={1.5}
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
               />
             </svg>
             Đổi tên
           </button>
           <button
             onClick={() => activeMenu && handlePin(activeMenu)}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2.5 text-left text-sm text-white/60 hover:bg-white/8 hover:text-white/85 flex items-center gap-3 transition-colors mx-1 rounded-md"
+            style={{ width: "calc(100% - 8px)" }}
           >
             <svg
               className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              strokeWidth={1.5}
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"
               />
             </svg>
             {pinnedConversations.includes(activeMenu || "")
               ? "Bỏ ghim"
               : "Ghim đoạn chat"}
           </button>
-          <hr className="my-1 border-gray-200" />
+          <div className="my-1.5 mx-2 border-t border-white/8" />
           <button
-            onClick={() => activeMenu && handleDelete(activeMenu)}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+            onClick={() => activeMenu && openDeleteModal(activeMenu)}
+            className="w-full px-4 py-2.5 text-left text-sm text-red-400/80 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-3 transition-colors mx-1 rounded-md"
+            style={{ width: "calc(100% - 8px)" }}
           >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
               <path
-                fillRule="evenodd"
-                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                clipRule="evenodd"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
               />
             </svg>
             Xóa
           </button>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModalOpen}
+        title="Xác nhận xóa"
+        message="Bạn có chắc chắn muốn xóa cuộc trò chuyện này? Hành động này không thể hoàn tác."
+        confirmText="Xóa"
+        cancelText="Hủy"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setDeleteTargetId(null);
+        }}
+      />
+
+      {/* Clear All Confirmation Modal */}
+      <ConfirmModal
+        isOpen={clearAllModalOpen}
+        title="Xóa tất cả lịch sử"
+        message="Bạn có chắc chắn muốn xóa tất cả lịch sử trò chuyện? Hành động này không thể hoàn tác."
+        confirmText="Xóa tất cả"
+        cancelText="Hủy"
+        variant="danger"
+        onConfirm={handleConfirmClearAll}
+        onCancel={() => setClearAllModalOpen(false)}
+      />
     </div>
   );
 }
