@@ -1,5 +1,5 @@
-import StartScreen from "@/screens/start_screen";
+import { LandingPage } from '@/screens/landing_screen';
 
 export default function Home() {
-  return <StartScreen />;
+  return <LandingPage />;
 }
