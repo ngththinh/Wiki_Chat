@@ -192,10 +192,10 @@ export const authService = {
 export const mockAuthService = {
   // Mock users database - updated to match backend UserDto structure
   users: [
-    { id: 1, username: 'test', email: 'test@example.com', password: 'password123', fullName: 'Test User', avatarUrl: null, role: 'user' },
-    { id: 2, username: 'demo', email: 'demo@example.com', password: 'demo123', fullName: 'Demo User', avatarUrl: null, role: 'user' },
-    { id: 3, username: 'admin', email: 'admin@wikichatbot.vn', password: 'admin123', fullName: 'Admin User', avatarUrl: null, role: 'admin' },
-  ],
+    { id: 1, username: 'test', email: 'test@example.com', password: 'password123', fullName: 'Test User', avatarUrl: null as string | null, role: 'user' },
+    { id: 2, username: 'demo', email: 'demo@example.com', password: 'demo123', fullName: 'Demo User', avatarUrl: null as string | null, role: 'user' },
+    { id: 3, username: 'admin', email: 'admin@wikichatbot.vn', password: 'admin123', fullName: 'Admin User', avatarUrl: null as string | null, role: 'admin' },
+  ] as Array<{ id: number; username: string; email: string; password: string; fullName: string | null; avatarUrl: string | null; role: string }>,
 
   async login(username: string, password: string): Promise<ApiResponse<LoginResponseDto>> {
     // Simulate API delay
