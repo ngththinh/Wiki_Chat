@@ -25,9 +25,9 @@ function validateLoginForm(data: LoginFormData): ValidationErrors {
   const errors: ValidationErrors = {};
 
   if (!data.username.trim()) {
-    errors.username = "Vui lòng nhập tên đăng nhập";
+    errors.username = "Vui lòng nhập tên đăng nhập hoặc email";
   } else if (data.username.length < 3) {
-    errors.username = "Tên đăng nhập phải có ít nhất 3 ký tự";
+    errors.username = "Tên đăng nhập hoặc email phải có ít nhất 3 ký tự";
   }
 
   if (!data.password) {
@@ -222,10 +222,10 @@ export default function LoginScreen() {
                   )}
 
                   <InputField
-                    label="Tên đăng nhập"
+                    label="Tên đăng nhập hoặc Email"
                     type="text"
                     name="username"
-                    placeholder="vd: nguyenvana"
+                    placeholder="vd: nguyenvana hoặc email@example.com"
                     value={formData.username}
                     onChange={handleInputChange}
                     error={errors.username}
