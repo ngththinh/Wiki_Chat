@@ -23,7 +23,7 @@ export interface UserDto {
 
 // Login request/response matching backend API
 export interface LoginDto {
-  username: string;
+  usernameOrEmail: string;
   password: string;
 }
 
@@ -60,7 +60,7 @@ export const authService = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password } as LoginDto),
+        body: JSON.stringify({ usernameOrEmail: username, password } as LoginDto),
       });
 
       const data = await response.json();
