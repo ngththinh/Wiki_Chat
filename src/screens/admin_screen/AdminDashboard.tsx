@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import authService from "@/lib/authService";
 import { ROUTES } from "@/constants";
 import { Document } from "@/types";
+import ConfirmModal from "@/components/common/ConfirmModal";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function AdminDashboard() {
   const [filterStatus, setFilterStatus] = useState<"all" | Document["status"]>(
     "all",
   );
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     published: 0,
@@ -100,6 +102,10 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
+    setLogoutModalOpen(true);
+  };
+
+  const confirmLogout = () => {
     authService.logout();
     router.push(ROUTES.LOGIN);
   };
@@ -636,6 +642,18 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Logout Confirmation Modal */}
+      <ConfirmModal
+        isOpen={logoutModalOpen}
+        title="Xác nhận đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?"
+        confirmText="Đăng xuất"
+        cancelText="Hủy"
+        variant="danger"
+        onConfirm={confirmLogout}
+        onCancel={() => setLogoutModalOpen(false)}
+      />
     </div>
   );
 }

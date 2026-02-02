@@ -44,6 +44,7 @@ export default function ChatSidebarNav({
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [clearAllModalOpen, setClearAllModalOpen] = useState(false);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
   // Fetch conversations from API
   useEffect(() => {
@@ -112,6 +113,10 @@ export default function ChatSidebarNav({
   });
 
   const handleLogout = () => {
+    setLogoutModalOpen(true);
+  };
+
+  const confirmLogout = () => {
     authService.logout();
     localStorage.removeItem("guestChatMessages");
     window.location.href = ROUTES.CHAT;
@@ -540,6 +545,18 @@ export default function ChatSidebarNav({
         variant="danger"
         onConfirm={handleConfirmClearAll}
         onCancel={() => setClearAllModalOpen(false)}
+      />
+
+      {/* Logout Confirmation Modal */}
+      <ConfirmModal
+        isOpen={logoutModalOpen}
+        title="Xác nhận đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?"
+        confirmText="Đăng xuất"
+        cancelText="Hủy"
+        variant="danger"
+        onConfirm={confirmLogout}
+        onCancel={() => setLogoutModalOpen(false)}
       />
     </div>
   );
