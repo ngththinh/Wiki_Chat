@@ -51,6 +51,8 @@ export default function ChatScreen() {
   const handleSendMessage = async (message: string, model: ChatModel) => {
     if (!message.trim()) return;
 
+    console.log("📤 Sending message, currentSessionId:", currentSessionId);
+
     const userMessage = createMessage("user", message, model);
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
@@ -61,16 +63,24 @@ export default function ChatScreen() {
       let sessionId = currentSessionId;
 
       if (!isGuest && !sessionId) {
+        console.log("🆕 Creating new session for first message");
         const sessionResponse = await historyService.createSession(
           message.slice(0, 50) + (message.length > 50 ? "..." : ""),
         );
 
         if (sessionResponse.success && sessionResponse.data) {
           sessionId = sessionResponse.data.id;
+          console.log("✅ Session created with ID:", sessionId);
           setCurrentSessionId(sessionId);
           setCurrentChat(sessionId.toString());
           setSidebarRefreshTrigger((prev) => prev + 1);
+        } else {
+          // Nếu tạo session thất bại, không tiếp tục
+          console.error("❌ Failed to create session:", sessionResponse.error);
+          throw new Error("Không thể tạo phiên trò chuyện");
         }
+      } else {
+        console.log("📝 Using existing session ID:", sessionId);
       }
 
       const response = await chatService.sendQuestion(message);
