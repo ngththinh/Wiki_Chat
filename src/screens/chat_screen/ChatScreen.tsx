@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import authService from "@/lib/authService";
 import chatService from "@/lib/chatService";
@@ -21,6 +21,7 @@ export default function ChatScreen() {
   const [isGuest, setIsGuest] = useState(true);
   const [currentChat, setCurrentChat] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
+  const sessionIdRef = useRef<number | null>(null); // Ref để lưu sessionId ngay lập tức
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ChatModel>("RAG");
@@ -51,7 +52,7 @@ export default function ChatScreen() {
   const handleSendMessage = async (message: string, model: ChatModel) => {
     if (!message.trim()) return;
 
-    console.log("📤 Sending message, currentSessionId:", currentSessionId);
+    console.log("📤 Sending message, sessionIdRef:", sessionIdRef.current);
 
     const userMessage = createMessage("user", message, model);
     const updatedMessages = [...messages, userMessage];
@@ -59,8 +60,8 @@ export default function ChatScreen() {
     setIsLoading(true);
 
     try {
-      // Nếu user đăng nhập và chưa có session, tạo session mới trước
-      let sessionId = currentSessionId;
+      // Sử dụng ref thay vì state để tránh vấn đề async
+      let sessionId = sessionIdRef.current;
 
       if (!isGuest && !sessionId) {
         console.log("🆕 Creating new session for first message");
@@ -71,6 +72,8 @@ export default function ChatScreen() {
         if (sessionResponse.success && sessionResponse.data) {
           sessionId = sessionResponse.data.id;
           console.log("✅ Session created with ID:", sessionId);
+          // Update cả ref và state
+          sessionIdRef.current = sessionId;
           setCurrentSessionId(sessionId);
           setCurrentChat(sessionId.toString());
           setSidebarRefreshTrigger((prev) => prev + 1);
@@ -137,6 +140,7 @@ export default function ChatScreen() {
     setMessages([]);
     setCurrentChat(null);
     setCurrentSessionId(null);
+    sessionIdRef.current = null; // Reset ref
 
     if (isGuest) {
       clearMessagesFromStorage();
@@ -172,6 +176,7 @@ export default function ChatScreen() {
         setMessages(loadedMessages);
         setCurrentChat(sessionId);
         setCurrentSessionId(numericSessionId);
+        sessionIdRef.current = numericSessionId; // Update ref
       }
     } catch (error) {
       // Error loading messages
