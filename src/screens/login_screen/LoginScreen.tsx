@@ -123,9 +123,9 @@ export default function LoginScreen() {
       {/* Glass editorial layer */}
       <div className="absolute inset-0 bg-slate-700/[0.02] backdrop-blur-[0.3px]" />
 
-      {/* Decorative vertical lines */}
-      <div className="absolute left-[15%] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-slate-300/40 to-transparent" />
-      <div className="absolute right-[15%] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-slate-300/40 to-transparent" />
+      {/* Decorative vertical lines - hidden on mobile */}
+      <div className="absolute left-[15%] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-slate-300/40 to-transparent hidden sm:block" />
+      <div className="absolute right-[15%] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-slate-300/40 to-transparent hidden sm:block" />
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
@@ -140,10 +140,10 @@ export default function LoginScreen() {
             borderBottom: "1px solid rgba(148,163,184,0.12)",
           }}
         >
-          <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
             <Link
               href="/"
-              className="flex items-center space-x-3 opacity-80 hover:opacity-100 transition-opacity duration-300"
+              className="flex items-center space-x-2 sm:space-x-3 opacity-80 hover:opacity-100 transition-opacity duration-300"
             >
               <div className="relative">
                 <div className="w-8 h-8 border border-slate-300/60" />
@@ -189,18 +189,18 @@ export default function LoginScreen() {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 flex items-center justify-center pt-24 pb-16 px-6">
+        <main className="flex-1 flex items-center justify-center pt-20 sm:pt-24 pb-8 sm:pb-16 px-4 sm:px-6">
           <div className="w-full max-w-md">
             {/* Editorial Header */}
-            <div className="text-center mb-12">
-              <div className="flex items-center justify-center gap-4 mb-6">
-                <div className="w-12 h-px bg-slate-300" />
-                <span className="text-[10px] text-slate-400 uppercase tracking-[0.3em]">
+            <div className="text-center mb-8 sm:mb-12">
+              <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <div className="w-8 sm:w-12 h-px bg-slate-300" />
+                <span className="text-[10px] text-slate-400 uppercase tracking-[0.2em] sm:tracking-[0.3em]">
                   Đăng nhập
                 </span>
-                <div className="w-12 h-px bg-slate-300" />
+                <div className="w-8 sm:w-12 h-px bg-slate-300" />
               </div>
-              <h1 className="text-3xl sm:text-4xl font-serif font-bold text-slate-900 mb-3 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif font-bold text-slate-900 mb-3 tracking-tight">
                 Chào mừng trở lại
               </h1>
               <p className="text-slate-500 text-sm leading-relaxed">
@@ -213,7 +213,7 @@ export default function LoginScreen() {
             {/* Glass Form Container */}
             <div className="relative">
               <div className="absolute inset-0 bg-white/60 backdrop-blur-sm border border-slate-200/80 shadow-sm" />
-              <div className="relative p-8">
+              <div className="relative p-5 sm:p-8">
                 <form className="space-y-6" onSubmit={handleSubmit}>
                   {errors.general && (
                     <div className="p-4 bg-red-50/80 border border-red-200/60 backdrop-blur-sm">
@@ -244,7 +244,7 @@ export default function LoginScreen() {
                   />
 
                   {/* Remember Me & Forgot Password */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"

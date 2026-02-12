@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, KeyboardEvent, useRef, useEffect } from 'react';
-import { ChatModel } from '@/utils/subdomain';
-import { MODELS } from '@/constants';
+import { useState, KeyboardEvent, useRef, useEffect } from "react";
+import { ChatModel } from "@/utils/subdomain";
+import { MODELS } from "@/constants";
 
 interface ChatInputProps {
   onSendMessage: (message: string, model: ChatModel) => void;
@@ -19,7 +19,7 @@ export default function ChatInput({
   onModelChange,
   isSubdomainModel = false,
 }: ChatInputProps) {
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -34,19 +34,19 @@ export default function ChatInput({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleSend = () => {
     if (message.trim() && !isLoading) {
       onSendMessage(message, selectedModel);
-      setMessage('');
+      setMessage("");
     }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -54,15 +54,15 @@ export default function ChatInput({
 
   return (
     <div className="border-t border-slate-200/50 bg-white/40 backdrop-blur-sm">
-      <div className="max-w-4xl mx-auto px-4 py-5">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-5">
         <div className="relative">
           {/* Glass input container */}
-          <div className="relative flex items-center gap-3 bg-white/70 backdrop-blur-sm border border-slate-200/80 px-5 py-3 focus-within:border-slate-400 focus-within:bg-white transition-all rounded-2xl shadow-sm">
+          <div className="relative flex items-center gap-2 sm:gap-3 bg-white/70 backdrop-blur-sm border border-slate-200/80 px-3 sm:px-5 py-2.5 sm:py-3 focus-within:border-slate-400 focus-within:bg-white transition-all rounded-2xl shadow-sm">
             {/* Model Selection Button - Editorial style */}
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="shrink-0 flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider font-medium bg-slate-100/80 border border-slate-200 hover:border-slate-400 hover:bg-white transition-all rounded-xl"
+                className="shrink-0 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-[9px] sm:text-[10px] uppercase tracking-wider font-medium bg-slate-100/80 border border-slate-200 hover:border-slate-400 hover:bg-white transition-all rounded-xl"
                 title="Select AI Model"
               >
                 <svg
@@ -81,7 +81,7 @@ export default function ChatInput({
                 <span className="text-slate-600">{selectedModel}</span>
                 <svg
                   className={`w-2.5 h-2.5 text-slate-400 transition-transform ${
-                    isDropdownOpen ? 'rotate-180' : ''
+                    isDropdownOpen ? "rotate-180" : ""
                   }`}
                   fill="none"
                   stroke="currentColor"
@@ -111,8 +111,8 @@ export default function ChatInput({
                     }}
                     className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
                       selectedModel === MODELS.RAG
-                        ? 'bg-slate-100 text-slate-900'
-                        : 'text-slate-600 hover:bg-slate-50'
+                        ? "bg-slate-100 text-slate-900"
+                        : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -144,8 +144,8 @@ export default function ChatInput({
                     }}
                     className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
                       selectedModel === MODELS.GRAPH_RAG
-                        ? 'bg-slate-100 text-slate-900'
-                        : 'text-slate-600 hover:bg-slate-50'
+                        ? "bg-slate-100 text-slate-900"
+                        : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -235,8 +235,8 @@ export default function ChatInput({
           </div>
         </div>
 
-        {/* Helper Text - Editorial style */}
-        <div className="flex items-center justify-center gap-4 mt-3">
+        {/* Helper Text - Editorial style - hidden on very small screens */}
+        <div className="hidden sm:flex items-center justify-center gap-4 mt-3">
           <div className="flex items-center gap-2 text-[10px] text-slate-400">
             <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-500 font-mono text-[9px] rounded-md">
               Enter

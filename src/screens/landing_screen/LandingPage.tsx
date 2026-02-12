@@ -1,62 +1,62 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
+import Link from "next/link";
 
 // ==================== DATA ====================
 const CATEGORIES = [
   {
     id: 1,
-    category: 'Lịch sử',
-    representative: 'Hồ Chí Minh',
-    years: '1890 – 1969',
+    category: "Lịch sử",
+    representative: "Hồ Chí Minh",
+    years: "1890 – 1969",
     description:
-      'Anh hùng giải phóng dân tộc, danh nhân văn hóa thế giới, người sáng lập nước Việt Nam Dân chủ Cộng hòa.',
-    tagline: 'Không có gì quý hơn độc lập, tự do.',
+      "Anh hùng giải phóng dân tộc, danh nhân văn hóa thế giới, người sáng lập nước Việt Nam Dân chủ Cộng hòa.",
+    tagline: "Không có gì quý hơn độc lập, tự do.",
   },
   {
     id: 2,
-    category: 'Vua – Hoàng đế',
-    representative: 'Lý Thái Tổ',
-    years: '974 – 1028',
+    category: "Vua – Hoàng đế",
+    representative: "Lý Thái Tổ",
+    years: "974 – 1028",
     description:
-      'Người sáng lập triều Lý, dời đô từ Hoa Lư về Thăng Long, mở ra kỷ nguyên thịnh trị.',
-    tagline: 'Vị vua mở đường cho thiên niên kỷ mới.',
+      "Người sáng lập triều Lý, dời đô từ Hoa Lư về Thăng Long, mở ra kỷ nguyên thịnh trị.",
+    tagline: "Vị vua mở đường cho thiên niên kỷ mới.",
   },
   {
     id: 3,
-    category: 'Kinh doanh – Thương nhân',
-    representative: 'Bạch Thái Bưởi',
-    years: '1874 – 1932',
+    category: "Kinh doanh – Thương nhân",
+    representative: "Bạch Thái Bưởi",
+    years: "1874 – 1932",
     description:
-      'Ông vua đường thủy, nhà tư sản dân tộc tiên phong, biểu tượng tinh thần khởi nghiệp.',
-    tagline: 'Khởi nghiệp từ hai bàn tay trắng.',
+      "Ông vua đường thủy, nhà tư sản dân tộc tiên phong, biểu tượng tinh thần khởi nghiệp.",
+    tagline: "Khởi nghiệp từ hai bàn tay trắng.",
   },
   {
     id: 4,
-    category: 'Giáo dục – Trí thức',
-    representative: 'Chu Văn An',
-    years: '1292 – 1370',
+    category: "Giáo dục – Trí thức",
+    representative: "Chu Văn An",
+    years: "1292 – 1370",
     description:
-      'Người thầy của muôn đời, biểu tượng cho đạo học và nhân cách cao quý.',
-    tagline: 'Thất trảm sớ và lòng trung chính.',
+      "Người thầy của muôn đời, biểu tượng cho đạo học và nhân cách cao quý.",
+    tagline: "Thất trảm sớ và lòng trung chính.",
   },
   {
     id: 5,
-    category: 'Quân sự – Danh tướng',
-    representative: 'Võ Nguyên Giáp',
-    years: '1911 – 2013',
+    category: "Quân sự – Danh tướng",
+    representative: "Võ Nguyên Giáp",
+    years: "1911 – 2013",
     description:
-      'Đại tướng huyền thoại, kiến trúc sư của chiến thắng Điện Biên Phủ.',
-    tagline: 'Vị tướng làm nên lịch sử thế kỷ 20.',
+      "Đại tướng huyền thoại, kiến trúc sư của chiến thắng Điện Biên Phủ.",
+    tagline: "Vị tướng làm nên lịch sử thế kỷ 20.",
   },
   {
     id: 6,
-    category: 'Văn hóa – Nghệ thuật',
-    representative: 'Nguyễn Du',
-    years: '1765 – 1820',
+    category: "Văn hóa – Nghệ thuật",
+    representative: "Nguyễn Du",
+    years: "1765 – 1820",
     description:
-      'Đại thi hào dân tộc, tác giả Truyện Kiều – kiệt tác văn học Việt Nam.',
-    tagline: 'Ba trăm năm sau, câu thơ vẫn còn lay động.',
+      "Đại thi hào dân tộc, tác giả Truyện Kiều – kiệt tác văn học Việt Nam.",
+    tagline: "Ba trăm năm sau, câu thơ vẫn còn lay động.",
   },
 ];
 
@@ -67,17 +67,17 @@ function Header() {
       className="fixed top-0 left-0 right-0 z-50"
       style={{
         background:
-          'linear-gradient(180deg, rgba(250,249,247,0.85) 0%, rgba(248,250,252,0.75) 100%)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        borderBottom: '1px solid rgba(148,163,184,0.12)',
+          "linear-gradient(180deg, rgba(250,249,247,0.85) 0%, rgba(248,250,252,0.75) 100%)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        borderBottom: "1px solid rgba(148,163,184,0.12)",
       }}
     >
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         {/* Logo - Understated editorial */}
         <Link
           href="/"
-          className="flex items-center space-x-3 opacity-80 hover:opacity-100 transition-opacity duration-300"
+          className="flex items-center space-x-2 sm:space-x-3 opacity-80 hover:opacity-100 transition-opacity duration-300"
         >
           <div className="relative">
             {/* Minimal frame */}
@@ -100,16 +100,16 @@ function Header() {
         </Link>
 
         {/* Navigation - Low contrast, understated */}
-        <nav className="flex items-center space-x-6">
+        <nav className="flex items-center space-x-3 sm:space-x-6">
           <Link
             href="/login"
-            className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors duration-300 tracking-wide"
+            className="text-[11px] sm:text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors duration-300 tracking-wide"
           >
             Đăng nhập
           </Link>
           <Link
             href="/register"
-            className="group flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors duration-300"
+            className="group flex items-center gap-1.5 text-[11px] sm:text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors duration-300"
           >
             <span className="border-b border-slate-400/50 group-hover:border-slate-600 pb-px">
               Đăng ký
@@ -137,13 +137,13 @@ function Header() {
 // ==================== HERO SECTION ====================
 function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center pt-16 sm:pt-20 overflow-hidden">
       {/* Base gradient: ivory to soft blue-gray */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(165deg, #FDFCFB 0%, #FAF9F7 25%, #F5F5F4 50%, #F1F5F9 80%, #E2E8F0 100%)',
+            "linear-gradient(165deg, #FDFCFB 0%, #FAF9F7 25%, #F5F5F4 50%, #F1F5F9 80%, #E2E8F0 100%)",
         }}
       ></div>
 
@@ -155,7 +155,7 @@ function HeroSection() {
             linear-gradient(to right, #475569 1px, transparent 1px),
             linear-gradient(to bottom, #475569 1px, transparent 1px)
           `,
-          backgroundSize: '60px 60px',
+          backgroundSize: "60px 60px",
         }}
       ></div>
 
@@ -167,7 +167,7 @@ function HeroSection() {
         className="absolute -top-32 -left-32 w-[600px] h-[600px] opacity-[0.08]"
         style={{
           background:
-            'radial-gradient(circle, rgba(241,245,249,1) 0%, transparent 70%)',
+            "radial-gradient(circle, rgba(241,245,249,1) 0%, transparent 70%)",
         }}
       ></div>
 
@@ -176,26 +176,26 @@ function HeroSection() {
         className="absolute -bottom-48 -right-48 w-[800px] h-[800px] opacity-[0.06]"
         style={{
           background:
-            'radial-gradient(circle, rgba(226,232,240,1) 0%, transparent 65%)',
+            "radial-gradient(circle, rgba(226,232,240,1) 0%, transparent 65%)",
         }}
       ></div>
 
-      {/* Decorative vertical lines */}
-      <div className="absolute left-[10%] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-slate-300/50 to-transparent"></div>
-      <div className="absolute right-[10%] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-slate-300/50 to-transparent"></div>
+      {/* Decorative vertical lines - hidden on mobile */}
+      <div className="absolute left-[10%] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-slate-300/50 to-transparent hidden sm:block"></div>
+      <div className="absolute right-[10%] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-slate-300/50 to-transparent hidden sm:block"></div>
 
-      <div className="relative z-10 text-center px-6 max-w-5xl mx-auto">
+      <div className="relative z-10 text-center px-4 sm:px-6 max-w-5xl mx-auto">
         {/* Editorial label */}
-        <div className="flex items-center justify-center gap-6 mb-12">
-          <div className="w-16 h-px bg-slate-300"></div>
-          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-[0.3em]">
+        <div className="flex items-center justify-center gap-3 sm:gap-6 mb-8 sm:mb-12">
+          <div className="w-8 sm:w-16 h-px bg-slate-300"></div>
+          <span className="text-[10px] sm:text-[11px] font-medium text-slate-400 uppercase tracking-[0.2em] sm:tracking-[0.3em]">
             AI Chatbot · Tri thức Việt Nam
           </span>
-          <div className="w-16 h-px bg-slate-300"></div>
+          <div className="w-8 sm:w-16 h-px bg-slate-300"></div>
         </div>
 
         {/* Main title - Serif editorial */}
-        <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold text-slate-900 mb-8 leading-[1.05] tracking-tight">
+        <h1 className="font-serif text-3xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-slate-900 mb-6 sm:mb-8 leading-[1.1] sm:leading-[1.05] tracking-tight">
           Hỏi AI về
           <br />
           <span className="italic font-normal text-slate-600">
@@ -204,24 +204,24 @@ function HeroSection() {
         </h1>
 
         {/* Decorative line */}
-        <div className="w-24 h-px bg-slate-300 mx-auto mb-10"></div>
+        <div className="w-16 sm:w-24 h-px bg-slate-300 mx-auto mb-6 sm:mb-10"></div>
 
         {/* Subtitle - Light editorial */}
-        <p className="text-lg sm:text-xl text-slate-500 mb-16 max-w-2xl mx-auto font-light leading-relaxed">
+        <p className="text-base sm:text-lg md:text-xl text-slate-500 mb-10 sm:mb-16 max-w-2xl mx-auto font-light leading-relaxed px-2">
           Khám phá hành trình tri thức qua những cuộc đối thoại với AI.
           <br className="hidden sm:block" />
           Từ anh hùng dân tộc đến các nhà văn hóa kiệt xuất.
         </p>
 
         {/* CTA - Minimal editorial style */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-5 sm:gap-8">
           <Link
             href="/chat"
-            className="group relative px-10 py-5 bg-slate-900 text-white overflow-hidden rounded-xl"
+            className="group relative px-8 sm:px-10 py-4 sm:py-5 bg-slate-900 text-white overflow-hidden rounded-xl w-full sm:w-auto text-center"
           >
             {/* Hover overlay */}
             <div className="absolute inset-0 bg-slate-700 translate-y-full group-hover:translate-y-0 transition-transform duration-500 rounded-xl"></div>
-            <span className="relative flex items-center gap-3 text-sm font-medium tracking-wide">
+            <span className="relative flex items-center justify-center gap-3 text-sm font-medium tracking-wide">
               Bắt đầu trò chuyện
               <svg
                 className="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
@@ -261,8 +261,8 @@ function HeroSection() {
         </div>
       </div>
 
-      {/* Bottom decorative element */}
-      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
+      {/* Bottom decorative element - hidden on small mobile */}
+      <div className="absolute bottom-8 sm:bottom-16 left-1/2 -translate-x-1/2 hidden sm:flex flex-col items-center gap-4">
         <span className="text-[10px] text-slate-400 uppercase tracking-[0.2em]">
           Cuộn xuống
         </span>
@@ -275,13 +275,13 @@ function HeroSection() {
 // ==================== INTRO SECTION ====================
 function IntroSection() {
   return (
-    <section className="relative py-32 px-6 overflow-hidden">
+    <section className="relative py-16 sm:py-32 px-4 sm:px-6 overflow-hidden">
       {/* Base: off-white with subtle warmth */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(180deg, #FAFAF9 0%, #FDFCFB 50%, #FAF9F7 100%)',
+            "linear-gradient(180deg, #FAFAF9 0%, #FDFCFB 50%, #FAF9F7 100%)",
         }}
       ></div>
 
@@ -293,7 +293,7 @@ function IntroSection() {
             linear-gradient(to right, #64748b 1px, transparent 1px),
             linear-gradient(to bottom, #64748b 1px, transparent 1px)
           `,
-          backgroundSize: '80px 80px',
+          backgroundSize: "80px 80px",
         }}
       ></div>
 
@@ -302,15 +302,15 @@ function IntroSection() {
         className="absolute top-1/4 -left-64 w-[500px] h-[500px] opacity-[0.05]"
         style={{
           background:
-            'radial-gradient(circle, rgba(203,213,225,1) 0%, transparent 60%)',
+            "radial-gradient(circle, rgba(203,213,225,1) 0%, transparent 60%)",
         }}
       ></div>
 
       <div className="max-w-5xl mx-auto relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-16 lg:gap-24 items-center">
           {/* Left: Glass visual block */}
           <div className="flex justify-center">
-            <div className="relative w-72 h-80 sm:w-80 sm:h-96">
+            <div className="relative w-56 h-64 sm:w-72 sm:h-80 md:w-80 md:h-96">
               {/* Background */}
               <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 rounded-2xl"></div>
 
@@ -326,8 +326,8 @@ function IntroSection() {
               <div className="absolute inset-4 bg-white/[0.06] backdrop-blur-sm border border-white/10 rounded-xl"></div>
 
               {/* Content */}
-              <div className="absolute inset-4 flex flex-col justify-between p-6 rounded-xl">
-                <div className="text-6xl sm:text-7xl font-serif font-bold text-white/10">
+              <div className="absolute inset-3 sm:inset-4 flex flex-col justify-between p-4 sm:p-6 rounded-xl">
+                <div className="text-5xl sm:text-6xl md:text-7xl font-serif font-bold text-white/10">
                   AI
                 </div>
                 <div>
@@ -355,7 +355,7 @@ function IntroSection() {
               </p>
             </div>
 
-            <h2 className="text-3xl sm:text-4xl font-serif font-bold text-slate-900 mb-6 leading-tight">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-bold text-slate-900 mb-6 leading-tight">
               AI như người kể chuyện
               <br />
               <span className="font-normal italic text-slate-600">lịch sử</span>
@@ -373,30 +373,30 @@ function IntroSection() {
               tộc.
             </p>
 
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-5 sm:gap-8 justify-center lg:justify-start">
               <div>
-                <p className="text-3xl font-serif font-bold text-slate-900">
+                <p className="text-2xl sm:text-3xl font-serif font-bold text-slate-900">
                   6+
                 </p>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">
                   Lĩnh vực
                 </p>
               </div>
-              <div className="w-px h-12 bg-slate-200"></div>
+              <div className="w-px h-10 sm:h-12 bg-slate-200"></div>
               <div>
-                <p className="text-3xl font-serif font-bold text-slate-900">
+                <p className="text-2xl sm:text-3xl font-serif font-bold text-slate-900">
                   100+
                 </p>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">
                   Danh nhân
                 </p>
               </div>
-              <div className="w-px h-12 bg-slate-200"></div>
+              <div className="w-px h-10 sm:h-12 bg-slate-200"></div>
               <div>
-                <p className="text-3xl font-serif font-bold text-slate-900">
+                <p className="text-2xl sm:text-3xl font-serif font-bold text-slate-900">
                   24/7
                 </p>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">
                   Hoạt động
                 </p>
               </div>
@@ -427,11 +427,11 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
 
   return (
     <div
-      className={`flex flex-col ${isReversed ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center gap-12 lg:gap-20`}
+      className={`flex flex-col ${isReversed ? "lg:flex-row-reverse" : "lg:flex-row"} items-center gap-12 lg:gap-20`}
     >
       {/* Visual Block - Glass/Translucent editorial style */}
       <div className="w-full lg:w-1/2 flex justify-center">
-        <div className="relative w-80 h-96 sm:w-[360px] sm:h-[420px] group">
+        <div className="relative w-64 h-80 sm:w-80 sm:h-96 md:w-[360px] md:h-[420px] group">
           {/* Background gradient layer */}
           <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 opacity-90 rounded-2xl"></div>
 
@@ -450,8 +450,8 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
           <div className="absolute inset-6 flex flex-col justify-between p-8 rounded-xl">
             {/* Top: Index number */}
             <div className="flex justify-between items-start">
-              <span className="text-7xl sm:text-8xl font-serif font-bold text-white/10 leading-none">
-                {String(index + 1).padStart(2, '0')}
+              <span className="text-5xl sm:text-7xl md:text-8xl font-serif font-bold text-white/10 leading-none">
+                {String(index + 1).padStart(2, "0")}
               </span>
               <div className="w-8 h-px bg-white/30 mt-6"></div>
             </div>
@@ -461,7 +461,7 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
               <p className="text-xs text-white/40 uppercase tracking-[0.25em] mb-3">
                 {item.category}
               </p>
-              <p className="text-2xl sm:text-3xl font-serif font-medium text-white/90 leading-tight">
+              <p className="text-xl sm:text-2xl md:text-3xl font-serif font-medium text-white/90 leading-tight">
                 {item.representative}
               </p>
             </div>
@@ -474,11 +474,11 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
 
       {/* Text Block */}
       <div
-        className={`w-full lg:w-1/2 ${isReversed ? 'lg:text-right' : 'lg:text-left'} text-center`}
+        className={`w-full lg:w-1/2 ${isReversed ? "lg:text-right" : "lg:text-left"} text-center`}
       >
         {/* Category label with line */}
         <div
-          className={`flex items-center gap-4 mb-6 ${isReversed ? 'lg:flex-row-reverse lg:justify-start justify-center' : 'lg:justify-start justify-center'}`}
+          className={`flex items-center gap-4 mb-6 ${isReversed ? "lg:flex-row-reverse lg:justify-start justify-center" : "lg:justify-start justify-center"}`}
         >
           <div className="w-12 h-px bg-slate-300"></div>
           <p className="text-xs font-medium text-slate-400 uppercase tracking-[0.2em]">
@@ -487,7 +487,7 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
         </div>
 
         {/* Representative name - Large editorial typography */}
-        <h3 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-bold text-slate-900 mb-4 leading-[1.05] tracking-tight">
+        <h3 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-slate-900 mb-4 leading-[1.05] tracking-tight">
           {item.representative}
         </h3>
 
@@ -497,7 +497,7 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
         </p>
 
         {/* Description */}
-        <p className="text-xl text-slate-600 mb-3 font-light leading-relaxed">
+        <p className="text-base sm:text-xl text-slate-600 mb-3 font-light leading-relaxed">
           {item.description}
         </p>
 
@@ -507,7 +507,7 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
         {/* CTA Button - Minimal style */}
         <Link
           href={getChatUrl()}
-          className={`inline-flex items-center gap-3 text-sm font-medium text-slate-900 hover:text-slate-600 transition-colors duration-300 group/btn ${isReversed ? 'lg:ml-auto' : ''}`}
+          className={`inline-flex items-center gap-3 text-sm font-medium text-slate-900 hover:text-slate-600 transition-colors duration-300 group/btn ${isReversed ? "lg:ml-auto" : ""}`}
         >
           <span className="border-b border-slate-900 group-hover/btn:border-slate-600 pb-1">
             Trò chuyện với AI
@@ -536,14 +536,14 @@ function CategoriesSection() {
   return (
     <section
       id="categories"
-      className="relative py-32 lg:py-40 px-6 overflow-hidden"
+      className="relative py-16 sm:py-32 lg:py-40 px-4 sm:px-6 overflow-hidden"
     >
       {/* Base gradient: ivory transitioning to cool gray */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(180deg, #FAF9F7 0%, #F8FAFC 30%, #F1F5F9 70%, #E2E8F0 100%)',
+            "linear-gradient(180deg, #FAF9F7 0%, #F8FAFC 30%, #F1F5F9 70%, #E2E8F0 100%)",
         }}
       ></div>
 
@@ -555,7 +555,7 @@ function CategoriesSection() {
             linear-gradient(to right, #475569 1px, transparent 1px),
             linear-gradient(to bottom, #475569 1px, transparent 1px)
           `,
-          backgroundSize: '60px 60px',
+          backgroundSize: "60px 60px",
         }}
       ></div>
 
@@ -567,7 +567,7 @@ function CategoriesSection() {
         className="absolute -top-48 -right-48 w-[700px] h-[700px] opacity-[0.07]"
         style={{
           background:
-            'radial-gradient(circle, rgba(241,245,249,1) 0%, transparent 60%)',
+            "radial-gradient(circle, rgba(241,245,249,1) 0%, transparent 60%)",
         }}
       ></div>
 
@@ -576,32 +576,32 @@ function CategoriesSection() {
         className="absolute -bottom-32 -left-32 w-[600px] h-[600px] opacity-[0.05]"
         style={{
           background:
-            'radial-gradient(circle, rgba(226,232,240,1) 0%, transparent 65%)',
+            "radial-gradient(circle, rgba(226,232,240,1) 0%, transparent 65%)",
         }}
       ></div>
 
       <div className="max-w-6xl mx-auto relative z-10">
         {/* Section Header - Editorial style */}
-        <div className="text-center mb-32">
-          <div className="flex items-center justify-center gap-6 mb-8">
-            <div className="w-20 h-px bg-slate-200"></div>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-[0.3em]">
+        <div className="text-center mb-16 sm:mb-32">
+          <div className="flex items-center justify-center gap-3 sm:gap-6 mb-6 sm:mb-8">
+            <div className="w-10 sm:w-20 h-px bg-slate-200"></div>
+            <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-[0.2em] sm:tracking-[0.3em]">
               Khám phá
             </p>
-            <div className="w-20 h-px bg-slate-200"></div>
+            <div className="w-10 sm:w-20 h-px bg-slate-200"></div>
           </div>
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-bold text-slate-900 mb-8 tracking-tight leading-[1.1]">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-slate-900 mb-6 sm:mb-8 tracking-tight leading-[1.1]">
             Chọn lĩnh vực
             <br className="hidden sm:block" /> bạn quan tâm
           </h2>
-          <p className="text-lg text-slate-500 max-w-xl mx-auto font-light leading-relaxed">
+          <p className="text-base sm:text-lg text-slate-500 max-w-xl mx-auto font-light leading-relaxed px-2">
             Mỗi danh nhân là một chương sử. Hãy để AI dẫn dắt bạn qua hành trình
             khám phá những di sản trí tuệ của dân tộc.
           </p>
         </div>
 
         {/* Editorial Blocks */}
-        <div className="space-y-28 lg:space-y-36">
+        <div className="space-y-16 sm:space-y-28 lg:space-y-36">
           {CATEGORIES.map((item, index) => (
             <CategoryBlock key={item.id} item={item} index={index} />
           ))}
@@ -614,13 +614,13 @@ function CategoriesSection() {
 // ==================== CTA SECTION ====================
 function CTASection() {
   return (
-    <section className="relative py-32 px-6 overflow-hidden">
+    <section className="relative py-16 sm:py-32 px-4 sm:px-6 overflow-hidden">
       {/* Base gradient: deep slate */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(165deg, #1e293b 0%, #0f172a 40%, #020617 100%)',
+            "linear-gradient(165deg, #1e293b 0%, #0f172a 40%, #020617 100%)",
         }}
       ></div>
 
@@ -632,7 +632,7 @@ function CTASection() {
             linear-gradient(to right, #475569 1px, transparent 1px),
             linear-gradient(to bottom, #475569 1px, transparent 1px)
           `,
-          backgroundSize: '60px 60px',
+          backgroundSize: "60px 60px",
         }}
       ></div>
 
@@ -641,7 +641,7 @@ function CTASection() {
         className="absolute -top-32 -left-32 w-[500px] h-[500px] opacity-[0.08]"
         style={{
           background:
-            'radial-gradient(circle, rgba(71,85,105,1) 0%, transparent 60%)',
+            "radial-gradient(circle, rgba(71,85,105,1) 0%, transparent 60%)",
         }}
       ></div>
 
@@ -650,26 +650,26 @@ function CTASection() {
         className="absolute -bottom-48 -right-48 w-[600px] h-[600px] opacity-[0.06]"
         style={{
           background:
-            'radial-gradient(circle, rgba(51,65,85,1) 0%, transparent 65%)',
+            "radial-gradient(circle, rgba(51,65,85,1) 0%, transparent 65%)",
         }}
       ></div>
 
-      {/* Vertical decorative lines */}
-      <div className="absolute left-1/4 top-0 bottom-0 w-px bg-white/[0.04]"></div>
-      <div className="absolute right-1/4 top-0 bottom-0 w-px bg-white/[0.04]"></div>
+      {/* Vertical decorative lines - hidden on mobile */}
+      <div className="absolute left-1/4 top-0 bottom-0 w-px bg-white/[0.04] hidden sm:block"></div>
+      <div className="absolute right-1/4 top-0 bottom-0 w-px bg-white/[0.04] hidden sm:block"></div>
 
       <div className="max-w-4xl mx-auto text-center relative z-10">
         {/* Editorial label */}
-        <div className="flex items-center justify-center gap-6 mb-10">
-          <div className="w-16 h-px bg-white/20"></div>
-          <span className="text-[11px] font-medium text-white/40 uppercase tracking-[0.3em]">
+        <div className="flex items-center justify-center gap-3 sm:gap-6 mb-8 sm:mb-10">
+          <div className="w-8 sm:w-16 h-px bg-white/20"></div>
+          <span className="text-[10px] sm:text-[11px] font-medium text-white/40 uppercase tracking-[0.2em] sm:tracking-[0.3em]">
             Bắt đầu ngay
           </span>
-          <div className="w-16 h-px bg-white/20"></div>
+          <div className="w-8 sm:w-16 h-px bg-white/20"></div>
         </div>
 
         {/* Title */}
-        <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-8 leading-[1.1] tracking-tight">
+        <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 sm:mb-8 leading-[1.1] tracking-tight">
           Sẵn sàng khám phá
           <br />
           <span className="italic font-normal text-white/60">
@@ -678,7 +678,7 @@ function CTASection() {
         </h2>
 
         {/* Description */}
-        <p className="text-lg text-white/50 mb-14 max-w-xl mx-auto font-light leading-relaxed">
+        <p className="text-base sm:text-lg text-white/50 mb-10 sm:mb-14 max-w-xl mx-auto font-light leading-relaxed px-2">
           Tạo tài khoản miễn phí để lưu lại lịch sử trò chuyện và tiếp tục hành
           trình khám phá bất cứ lúc nào.
         </p>
@@ -687,10 +687,10 @@ function CTASection() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
           <Link
             href="/register"
-            className="group relative px-10 py-5 bg-white text-slate-900 overflow-hidden rounded-xl"
+            className="group relative px-8 sm:px-10 py-4 sm:py-5 bg-white text-slate-900 overflow-hidden rounded-xl w-full sm:w-auto text-center"
           >
             <div className="absolute inset-0 bg-stone-100 translate-y-full group-hover:translate-y-0 transition-transform duration-500 rounded-xl"></div>
-            <span className="relative flex items-center gap-3 text-sm font-medium tracking-wide">
+            <span className="relative flex items-center justify-center gap-3 text-sm font-medium tracking-wide">
               Đăng ký miễn phí
               <svg
                 className="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
@@ -736,12 +736,12 @@ function CTASection() {
 // ==================== FOOTER ====================
 function Footer() {
   return (
-    <footer className="relative py-16 px-6 border-t border-slate-200/50 overflow-hidden">
+    <footer className="relative py-10 sm:py-16 px-4 sm:px-6 border-t border-slate-200/50 overflow-hidden">
       {/* Base gradient */}
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%)',
+          background: "linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%)",
         }}
       ></div>
 
@@ -753,11 +753,11 @@ function Footer() {
             linear-gradient(to right, #64748b 1px, transparent 1px),
             linear-gradient(to bottom, #64748b 1px, transparent 1px)
           `,
-          backgroundSize: '60px 60px',
+          backgroundSize: "60px 60px",
         }}
       ></div>
       <div className="max-w-6xl mx-auto relative z-10">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-10">
           {/* Logo */}
           <div className="flex items-center space-x-4">
             <div className="relative">
@@ -778,7 +778,7 @@ function Footer() {
           </div>
 
           {/* Links */}
-          <div className="flex items-center gap-10 text-sm">
+          <div className="flex items-center gap-6 sm:gap-10 text-sm">
             <Link
               href="/chat"
               className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
@@ -821,7 +821,7 @@ export default function LandingPage() {
       className="min-h-screen"
       style={{
         background:
-          'linear-gradient(180deg, #FDFCFB 0%, #FAF9F7 50%, #F1F5F9 100%)',
+          "linear-gradient(180deg, #FDFCFB 0%, #FAF9F7 50%, #F1F5F9 100%)",
       }}
     >
       <Header />

@@ -26,7 +26,8 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ChatModel>("RAG");
   const [isSubdomainModel, setIsSubdomainModel] = useState(false);
-  const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0); // Trigger để refresh sidebar
+  const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Detect subdomain and set model accordingly
   useEffect(() => {
@@ -229,14 +230,36 @@ export default function ChatScreen() {
 
       {/* Sidebar - Only show when logged in */}
       {!isGuest && (
-        <ChatSidebarNav
-          user={user}
-          isGuest={isGuest}
-          onNewChat={handleNewChat}
-          onSelectChat={handleSelectChat}
-          currentChat={currentChat}
-          refreshTrigger={sidebarRefreshTrigger}
-        />
+        <>
+          {/* Mobile sidebar overlay */}
+          {isMobileSidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 z-30 md:hidden"
+              onClick={() => setIsMobileSidebarOpen(false)}
+            />
+          )}
+          {/* Sidebar wrapper - drawer on mobile, static on desktop */}
+          <div
+            className={`fixed md:relative z-40 h-full transition-transform duration-300 ease-in-out md:translate-x-0 ${
+              isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
+          >
+            <ChatSidebarNav
+              user={user}
+              isGuest={isGuest}
+              onNewChat={() => {
+                handleNewChat();
+                setIsMobileSidebarOpen(false);
+              }}
+              onSelectChat={(id) => {
+                handleSelectChat(id);
+                setIsMobileSidebarOpen(false);
+              }}
+              currentChat={currentChat}
+              refreshTrigger={sidebarRefreshTrigger}
+            />
+          </div>
+        </>
       )}
 
       {/* Main Chat Area */}
@@ -244,7 +267,7 @@ export default function ChatScreen() {
         {/* Guest Header - Editorial style */}
         {isGuest && (
           <header className="relative border-b border-slate-200/50 bg-white/40 backdrop-blur-sm">
-            <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="max-w-5xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
               {/* Logo */}
               <Link href="/" className="flex items-center space-x-3 group">
                 <div className="relative">
@@ -265,26 +288,75 @@ export default function ChatScreen() {
               </Link>
 
               {/* Guest badge & Auth buttons */}
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/50 border border-slate-200">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="flex items-center gap-2 px-2 sm:px-3 py-1.5 bg-slate-100/50 border border-slate-200">
                   <div className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+                  <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-wider font-medium">
                     Khách
                   </span>
                 </div>
                 <Link
                   href="/login"
-                  className="text-xs text-slate-600 hover:text-slate-900 transition-colors border-b border-transparent hover:border-slate-400 pb-px"
+                  className="text-[11px] sm:text-xs text-slate-600 hover:text-slate-900 transition-colors border-b border-transparent hover:border-slate-400 pb-px hidden sm:inline"
                 >
                   Đăng nhập
                 </Link>
                 <Link
                   href="/register"
-                  className="text-xs px-4 py-2 bg-slate-900 text-white hover:bg-slate-700 transition-colors"
+                  className="text-[11px] sm:text-xs px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-900 text-white hover:bg-slate-700 transition-colors"
                 >
                   Đăng ký
                 </Link>
               </div>
+            </div>
+          </header>
+        )}
+
+        {/* Mobile header with hamburger for logged-in users */}
+        {!isGuest && (
+          <header className="relative border-b border-slate-200/50 bg-white/40 backdrop-blur-sm md:hidden">
+            <div className="px-3 py-3 flex items-center justify-between">
+              <button
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="w-9 h-9 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                  />
+                </svg>
+              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-serif font-medium text-slate-700">
+                  WikiChatbot
+                </span>
+              </div>
+              <button
+                onClick={handleNewChat}
+                className="w-9 h-9 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+              </button>
             </div>
           </header>
         )}

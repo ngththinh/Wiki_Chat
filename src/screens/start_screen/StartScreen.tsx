@@ -5,8 +5,8 @@ export default function StartScreen() {
   return (
     <div className="flex min-h-screen">
       {/* Right Side - Content Section */}
-      <div className="flex flex-1 items-center justify-center px-8 py-12 bg-white">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex flex-1 items-center justify-center px-4 sm:px-8 py-8 sm:py-12 bg-white">
+        <div className="w-full max-w-md space-y-6 sm:space-y-8">
           {/* Logo */}
           <div className="flex flex-col items-center space-y-3">
             <div className="flex items-center justify-center w-16 h-16 bg-linear-to-br from-blue-500 to-blue-600 rounded-2xl rotate-45 shadow-lg">
@@ -40,7 +40,7 @@ export default function StartScreen() {
           {/* Main Content */}
           <div className="space-y-6">
             <div className="text-center space-y-3">
-              <h1 className="text-4xl font-bold text-gray-900">
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">
                 <span className="text-blue-600">Học hỏi</span> từ những người
                 giỏi nhất
               </h1>

@@ -1,7 +1,7 @@
 // API Configuration
 // Port 3000 is for frontend Next.js dev server
-// Backend API URL (production hoặc localhost:8000)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://sep490-8-wikichatbot-backends.onrender.com/api';
+// Backend API URL - uses Next.js rewrites proxy to avoid CORS
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
 
 // API Response Types
 export interface ApiResponse<T> {

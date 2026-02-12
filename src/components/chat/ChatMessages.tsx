@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { SUGGESTION_CARDS } from '@/constants';
-import { Message } from '@/utils/chat';
+import { SUGGESTION_CARDS } from "@/constants";
+import { Message } from "@/utils/chat";
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -17,17 +17,17 @@ export default function ChatMessages({
   const hasMessages = messages.length > 0;
   const lastMessage = messages[messages.length - 1];
   const showRegenerateButton =
-    hasMessages && lastMessage?.role === 'assistant' && !isLoading;
+    hasMessages && lastMessage?.role === "assistant" && !isLoading;
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {!hasMessages && !isLoading && (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <div className="flex flex-col items-center justify-center min-h-[50vh] sm:min-h-[60vh] text-center">
             {/* Editorial Welcome Icon */}
-            <div className="relative mb-8">
-              <div className="w-20 h-20 border border-slate-300 rounded-2xl"></div>
-              <div className="absolute inset-2 bg-slate-100/50 backdrop-blur-sm rounded-xl"></div>
+            <div className="relative mb-6 sm:mb-8">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 border border-slate-300 rounded-2xl"></div>
+              <div className="absolute inset-1.5 sm:inset-2 bg-slate-100/50 backdrop-blur-sm rounded-xl"></div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <svg
                   className="w-8 h-8 text-slate-500"
@@ -54,10 +54,10 @@ export default function ChatMessages({
               <div className="w-12 h-px bg-slate-300"></div>
             </div>
 
-            <h2 className="text-3xl font-serif font-bold text-slate-800 mb-3">
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-slate-800 mb-3">
               Chào mừng đến với WikiChatbot
             </h2>
-            <p className="text-slate-500 max-w-md mb-10 text-sm leading-relaxed">
+            <p className="text-slate-500 max-w-md mb-8 sm:mb-10 text-sm leading-relaxed px-2">
               Hỏi tôi bất cứ điều gì về các danh nhân Việt Nam.
               <br />
               <span className="italic">
@@ -66,7 +66,7 @@ export default function ChatMessages({
             </p>
 
             {/* Suggestion Cards - Editorial style */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full max-w-2xl">
               {SUGGESTION_CARDS.map((card, index) => (
                 <SuggestionCard key={index} icon={card.icon} text={card.text} />
               ))}
@@ -75,7 +75,7 @@ export default function ChatMessages({
         )}
 
         {/* Messages */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))}
@@ -95,11 +95,11 @@ export default function ChatMessages({
                   <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
                   <div
                     className="w-2 h-2 bg-slate-500 rounded-full animate-bounce"
-                    style={{ animationDelay: '0.1s' }}
+                    style={{ animationDelay: "0.1s" }}
                   ></div>
                   <div
                     className="w-2 h-2 bg-slate-600 rounded-full animate-bounce"
-                    style={{ animationDelay: '0.2s' }}
+                    style={{ animationDelay: "0.2s" }}
                   ></div>
                 </div>
               </div>
@@ -157,16 +157,16 @@ function SuggestionCard({ icon, text }: { icon: string; text: string }) {
 
 // Message Bubble Component - Editorial style
 function MessageBubble({ message }: { message: Message }) {
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
 
   return (
     <div
-      className={`flex items-start gap-4 ${isUser ? 'flex-row-reverse' : ''}`}
+      className={`flex items-start gap-2 sm:gap-4 ${isUser ? "flex-row-reverse" : ""}`}
     >
       {/* Avatar - Editorial square style */}
-      <div className="relative shrink-0">
+      <div className="relative shrink-0 hidden sm:block">
         <div
-          className={`w-10 h-10 border rounded-xl ${isUser ? 'border-slate-400 bg-slate-800' : 'border-slate-300'}`}
+          className={`w-10 h-10 border rounded-xl ${isUser ? "border-slate-400 bg-slate-800" : "border-slate-300"}`}
         ></div>
         {!isUser && (
           <div className="absolute inset-1.5 bg-slate-100/50 rounded-lg"></div>
@@ -194,42 +194,42 @@ function MessageBubble({ message }: { message: Message }) {
 
       {/* Message Content - Editorial style */}
       <div
-        className={`flex-1 p-5 rounded-2xl shadow-sm ${
+        className={`flex-1 p-3 sm:p-5 rounded-2xl shadow-sm ${
           isUser
-            ? 'bg-slate-800 text-white'
-            : 'bg-white/60 backdrop-blur-sm border border-slate-200/80'
+            ? "bg-slate-800 text-white"
+            : "bg-white/60 backdrop-blur-sm border border-slate-200/80"
         }`}
       >
         <p
           className={`text-sm leading-relaxed ${
-            isUser ? 'text-white/90' : 'text-slate-700'
+            isUser ? "text-white/90" : "text-slate-700"
           }`}
         >
           {message.content}
         </p>
         <div
           className={`flex items-center gap-2 mt-3 pt-3 border-t ${
-            isUser ? 'border-slate-700' : 'border-slate-100'
+            isUser ? "border-slate-700" : "border-slate-100"
           }`}
         >
           <span
             className={`text-[10px] uppercase tracking-wider ${
-              isUser ? 'text-slate-400' : 'text-slate-400'
+              isUser ? "text-slate-400" : "text-slate-400"
             }`}
           >
             {new Date(message.timestamp).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
+              hour: "2-digit",
+              minute: "2-digit",
             })}
           </span>
           {message.model && (
             <>
               <span
-                className={`w-1 h-1 rounded-full ${isUser ? 'bg-slate-600' : 'bg-slate-300'}`}
+                className={`w-1 h-1 rounded-full ${isUser ? "bg-slate-600" : "bg-slate-300"}`}
               ></span>
               <span
                 className={`text-[10px] uppercase tracking-wider ${
-                  isUser ? 'text-slate-400' : 'text-slate-400'
+                  isUser ? "text-slate-400" : "text-slate-400"
                 }`}
               >
                 {message.model}

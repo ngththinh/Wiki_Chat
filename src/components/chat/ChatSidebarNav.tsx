@@ -206,7 +206,7 @@ export default function ChatSidebarNav({
   };
 
   return (
-    <div className="w-72 relative flex flex-col overflow-visible">
+    <div className="w-72 h-full relative flex flex-col overflow-visible">
       {/* Background */}
       <div
         className="absolute inset-0"

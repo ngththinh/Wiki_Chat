@@ -39,13 +39,13 @@ export default function InputField({
           value={value}
           onChange={onChange}
           name={name}
-          className={`w-full px-4 py-3.5 bg-white/50 backdrop-blur-sm border ${
+          className={`w-full px-3 sm:px-4 py-3 sm:py-3.5 bg-white/50 backdrop-blur-sm border ${
             error ? "border-red-400" : "border-slate-200"
           } focus:outline-none focus:ring-1 ${
             error
               ? "focus:ring-red-400 focus:border-red-400"
               : "focus:ring-slate-400 focus:border-slate-400"
-          } transition-all text-slate-800 placeholder:text-slate-400 text-sm pr-12`}
+          } transition-all text-slate-800 placeholder:text-slate-400 text-sm pr-12 rounded-lg`}
         />
         {isPassword && (
           <button

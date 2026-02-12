@@ -57,13 +57,13 @@ export default function ConfirmModal({
       />
 
       {/* Modal - Editorial style */}
-      <div className="relative bg-white shadow-2xl max-w-md w-full mx-4 transform transition-all animate-scale-in rounded-lg overflow-hidden">
+      <div className="relative bg-white shadow-2xl max-w-md w-full mx-3 sm:mx-4 transform transition-all animate-scale-in rounded-lg overflow-hidden">
         {/* Header decoration */}
         <div
           className={`h-1 ${variant === "danger" ? "bg-gradient-to-r from-red-300 via-red-500 to-red-300" : "bg-gradient-to-r from-slate-300 via-slate-400 to-slate-300"}`}
         ></div>
 
-        <div className="p-8">
+        <div className="p-5 sm:p-8">
           {/* Warning Icon for danger variant */}
           {variant === "danger" && (
             <div className="flex justify-center mb-4">
@@ -101,21 +101,21 @@ export default function ConfirmModal({
           </div>
 
           {/* Message */}
-          <p className="text-slate-600 text-center text-sm leading-relaxed mb-8">
+          <p className="text-slate-600 text-center text-sm leading-relaxed mb-6 sm:mb-8">
             {message}
           </p>
 
           {/* Buttons - Editorial style */}
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={onCancel}
-              className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-medium hover:bg-slate-200 transition-colors text-sm tracking-wide border border-slate-200 rounded-lg"
+              className="flex-1 px-4 py-2.5 sm:py-3 bg-slate-100 text-slate-600 font-medium hover:bg-slate-200 transition-colors text-sm tracking-wide border border-slate-200 rounded-lg"
             >
               {cancelText}
             </button>
             <button
               onClick={onConfirm}
-              className={`flex-1 px-4 py-3 font-medium transition-colors text-sm tracking-wide rounded-lg ${
+              className={`flex-1 px-4 py-2.5 sm:py-3 font-medium transition-colors text-sm tracking-wide rounded-lg ${
                 variant === "danger"
                   ? "bg-red-500 text-white hover:bg-red-600"
                   : "bg-slate-900 text-white hover:bg-slate-700"
