@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
       {
         source: "/api/:path*",
         destination:
-          "https://sep490-8-wikichatbot-backends.onrender.com/api/:path*",
+          "https://sep490wikichatbotbackends-cmb2ajgqgpe8c9ha.japanwest-01.azurewebsites.net/api/:path*",
       },
     ];
   },

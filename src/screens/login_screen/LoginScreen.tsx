@@ -80,7 +80,8 @@ export default function LoginScreen() {
 
       if (response.success) {
         const user = authService.getCurrentUser();
-        if (user?.role === "admin") {
+        // So sánh role không phân biệt chữ hoa/thường
+        if (user?.role?.toLowerCase() === "admin") {
           router.push(ROUTES.ADMIN);
         } else {
           router.push(ROUTES.CHAT);

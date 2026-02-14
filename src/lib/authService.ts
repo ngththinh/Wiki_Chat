@@ -55,6 +55,8 @@ export const authService = {
   // Login với username và password
   async login(username: string, password: string): Promise<ApiResponse<LoginResponseDto>> {
     try {
+      console.log("🔐 Login attempt with:", { usernameOrEmail: username, password: "***" });
+      
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -64,8 +66,11 @@ export const authService = {
       });
 
       const data = await response.json();
+      console.log("🔐 Login response status:", response.status);
+      console.log("🔐 Login response data:", data);
 
       if (!response.ok) {
+        console.error("❌ Login failed:", data);
         return {
           success: false,
           error: data.message || data.detail || 'Đăng nhập thất bại',
@@ -74,6 +79,7 @@ export const authService = {
 
       // Save token và user info to localStorage
       if (data.token) {
+        console.log("✅ Login success, user role:", data.user?.role);
         localStorage.setItem('authToken', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
       }
@@ -83,6 +89,7 @@ export const authService = {
         data,
       };
     } catch (error) {
+      console.error("❌ Login error:", error);
       return {
         success: false,
         error: 'Lỗi kết nối. Vui lòng kiểm tra mạng.',

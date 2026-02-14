@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -48,8 +49,9 @@ export default function ConfirmModal({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  // Sử dụng Portal để render modal ra ngoài DOM tree, tránh bị ảnh hưởng bởi parent container
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop with blur */}
       <div
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
@@ -144,4 +146,11 @@ export default function ConfirmModal({
       `}</style>
     </div>
   );
+
+  // Render vào document.body để modal luôn căn giữa màn hình
+  if (typeof window !== "undefined") {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 }
