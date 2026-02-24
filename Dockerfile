@@ -1,40 +1,27 @@
-# ---- Stage 1: Install dependencies ----
-FROM node:20-alpine AS deps
+# Stage 1: Install dependencies
+FROM node:18-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
-# ---- Stage 2: Build the application ----
-FROM node:20-alpine AS builder
+# Stage 2: Build
+FROM node:18-alpine AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-# Build arguments for environment variables (set in Azure pipeline or CLI)
 ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
-
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 RUN npm run build
 
-# ---- Stage 3: Production runner ----
-FROM node:20-alpine AS runner
+# Stage 3: Runner
+FROM node:18-alpine AS runner
 WORKDIR /app
-
-ENV NODE_ENV=production
-# Azure App Service uses port 8080 by default
-ENV PORT=8080
-ENV HOSTNAME="0.0.0.0"
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy necessary files from builder
+ENV NODE_ENV production
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 
-USER nextjs
+EXPOSE 3000
+CMD ["npm", "start"]
 
-EXPOSE 8080
-
-CMD ["node", "server.js"]
