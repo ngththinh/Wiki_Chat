@@ -23,6 +23,7 @@ jobs:
         run: |
           docker build . -t ${{ secrets.ACR_LOGIN_SERVER }}/nextjs-app:${{ github.sha }}
           docker push ${{ secrets.ACR_LOGIN_SERVER }}/nextjs-app:${{ github.sha }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/nextjs-app:latest
 
       # - name: Deploy to Azure Web App
       #   uses: azure/webapps-deploy@v2
