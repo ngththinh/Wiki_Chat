@@ -50,6 +50,57 @@ export interface UpdateProfileDto {
 export interface LoginResponse extends LoginResponseDto {}
 export interface RegisterResponse extends LoginResponseDto {}
 
+const AUTH_TOKEN_KEY = "authToken";
+const AUTH_USER_KEY = "user";
+const AUTH_TOKEN_ISSUED_AT_KEY = "authTokenIssuedAt";
+const TOKEN_SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes
+
+const persistAuthSession = (token: string, user: UserDto) => {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  localStorage.setItem(AUTH_TOKEN_ISSUED_AT_KEY, Date.now().toString());
+};
+
+const clearAuthSession = () => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+  localStorage.removeItem(AUTH_TOKEN_ISSUED_AT_KEY);
+};
+
+const getStoredToken = () => localStorage.getItem(AUTH_TOKEN_KEY);
+
+const hasTokenExpired = () => {
+  const token = getStoredToken();
+  if (!token) return false;
+
+  const issuedAtRaw = localStorage.getItem(AUTH_TOKEN_ISSUED_AT_KEY);
+  if (!issuedAtRaw) {
+    // Backward compatibility for old sessions created before timeout support.
+    localStorage.setItem(AUTH_TOKEN_ISSUED_AT_KEY, Date.now().toString());
+    return false;
+  }
+
+  const issuedAt = Number(issuedAtRaw);
+  if (!Number.isFinite(issuedAt)) {
+    clearAuthSession();
+    return true;
+  }
+
+  if (Date.now() - issuedAt >= TOKEN_SESSION_TIMEOUT_MS) {
+    clearAuthSession();
+    return true;
+  }
+
+  return false;
+};
+
+export const getValidAuthToken = (): string | null => {
+  const token = getStoredToken();
+  if (!token) return null;
+  if (hasTokenExpired()) return null;
+  return token;
+};
+
 // Auth Service
 export const authService = {
   // Login với username và password
@@ -80,8 +131,7 @@ export const authService = {
       // Save token và user info to localStorage
       if (data.token) {
         console.log("✅ Login success, user role:", data.user?.role);
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        persistAuthSession(data.token, data.user);
       }
 
       return {
@@ -119,8 +169,7 @@ export const authService = {
 
       // Save token và user info to localStorage
       if (data.token) {
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        persistAuthSession(data.token, data.user);
       }
 
       return {
@@ -138,7 +187,14 @@ export const authService = {
   // Update user profile
   async updateProfile(profileData: UpdateProfileDto): Promise<ApiResponse<UserDto>> {
     try {
-      const token = localStorage.getItem('authToken');
+      const token = getValidAuthToken();
+      if (!token) {
+        return {
+          success: false,
+          error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        };
+      }
+
       const response = await fetch(`${API_BASE_URL}/auth/profile`, {
         method: 'PUT',
         headers: {
@@ -158,7 +214,7 @@ export const authService = {
       }
 
       // Update user in localStorage
-      localStorage.setItem('user', JSON.stringify(data));
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data));
 
       return {
         success: true,
@@ -174,24 +230,33 @@ export const authService = {
 
   // Logout
   logout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
+    clearAuthSession();
   },
 
   // Get current user
   getCurrentUser() {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    if (!getValidAuthToken()) return null;
+
+    const userStr = localStorage.getItem(AUTH_USER_KEY);
+    if (!userStr) return null;
+
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      // Keep authToken intact; only remove corrupted user payload.
+      localStorage.removeItem(AUTH_USER_KEY);
+      return null;
+    }
   },
 
   // Check if user is authenticated
   isAuthenticated() {
-    return !!localStorage.getItem('authToken');
+    return !!getValidAuthToken();
   },
 
   // Get auth token
   getToken() {
-    return localStorage.getItem('authToken');
+    return getValidAuthToken();
   },
 };
 
@@ -228,8 +293,7 @@ export const mockAuthService = {
     };
 
     // Save to localStorage
-    localStorage.setItem('authToken', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    persistAuthSession(token, userData);
 
     return {
       success: true,
@@ -286,8 +350,7 @@ export const mockAuthService = {
     };
 
     // Save to localStorage
-    localStorage.setItem('authToken', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    persistAuthSession(token, userData);
 
     return {
       success: true,
@@ -324,21 +387,29 @@ export const mockAuthService = {
   },
 
   logout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
+    clearAuthSession();
   },
 
   getCurrentUser(): UserDto | null {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    if (!getValidAuthToken()) return null;
+
+    const userStr = localStorage.getItem(AUTH_USER_KEY);
+    if (!userStr) return null;
+
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      localStorage.removeItem(AUTH_USER_KEY);
+      return null;
+    }
   },
 
   isAuthenticated() {
-    return !!localStorage.getItem('authToken');
+    return !!getValidAuthToken();
   },
 
   getToken() {
-    return localStorage.getItem('authToken');
+    return getValidAuthToken();
   },
 };
 

@@ -69,19 +69,19 @@ export const MESSAGES = {
 export const SUGGESTION_CARDS = [
   {
     icon: "💡",
-    text: "Phạm Nhật Vượng thành công như thế nào?",
+    text: "Hồ Chí Minh là ai?",
   },
   {
     icon: "🚀",
-    text: "Bắt đầu startup công nghệ như thế nào?",
+    text: "Võ Nguyên Giáp có vai trò gì trong chiến tranh giải phóng Việt Nam?",
   },
   {
     icon: "📈",
-    text: "Chiến lược kinh doanh hiệu quả nhất",
+    text: "Nguyễn Trãi có đóng góp gì trong lịch sử Việt Nam?",
   },
   {
     icon: "💼",
-    text: "Bài học từ các danh nhân Việt",
+    text: "Quang Trung - Nguyễn Huệ đã có vai trò gì trong lịch sử Việt Nam?",
   },
 ] as const;
 

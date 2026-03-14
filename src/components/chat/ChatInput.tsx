@@ -10,6 +10,8 @@ interface ChatInputProps {
   selectedModel: ChatModel;
   onModelChange: (model: ChatModel) => void;
   isSubdomainModel?: boolean;
+  prefillMessage?: string | null;
+  prefillNonce?: number;
 }
 
 export default function ChatInput({
@@ -18,10 +20,13 @@ export default function ChatInput({
   selectedModel,
   onModelChange,
   isSubdomainModel = false,
+  prefillMessage,
+  prefillNonce = 0,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const lastHandledPrefillRef = useRef(0);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -37,6 +42,18 @@ export default function ChatInput({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Auto-fill and send message when user clicks a suggestion card.
+  useEffect(() => {
+    if (!prefillMessage || prefillNonce === 0) return;
+    if (prefillNonce === lastHandledPrefillRef.current) return;
+    if (isLoading) return;
+
+    lastHandledPrefillRef.current = prefillNonce;
+    setMessage(prefillMessage);
+    onSendMessage(prefillMessage, selectedModel);
+    setMessage("");
+  }, [prefillMessage, prefillNonce, isLoading, onSendMessage, selectedModel]);
 
   const handleSend = () => {
     if (message.trim() && !isLoading) {

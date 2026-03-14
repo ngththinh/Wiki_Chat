@@ -1,4 +1,5 @@
 import { apiClient, ApiResponse } from './apiClient';
+import authService from './authService';
 
 // =====================
 // Backend API Types (matching Swagger)
@@ -130,7 +131,7 @@ export const chatService = {
     const queryString = params.toString() ? `?${params.toString()}` : '';
 
     try {
-      const token = localStorage.getItem('authToken');
+      const token = authService.getToken();
       const headers: HeadersInit = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
