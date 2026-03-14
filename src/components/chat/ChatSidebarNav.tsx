@@ -14,6 +14,8 @@ interface ChatSidebarNavProps {
   onSelectChat?: (sessionId: string) => void;
   currentChat: string | null;
   refreshTrigger?: number;
+  collapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 interface Conversation {
@@ -30,6 +32,8 @@ export default function ChatSidebarNav({
   onSelectChat,
   currentChat,
   refreshTrigger = 0,
+  collapsed = false,
+  onToggleSidebar,
 }: ChatSidebarNavProps) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -46,6 +50,8 @@ export default function ChatSidebarNav({
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [clearAllModalOpen, setClearAllModalOpen] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
 
   // Fetch conversations from API
   useEffect(() => {
@@ -77,10 +83,28 @@ export default function ChatSidebarNav({
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setActiveMenu(null);
       }
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActiveMenu(null);
+        setIsAccountMenuOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEsc);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
   }, []);
 
   const handleMenuToggle = (
@@ -114,6 +138,7 @@ export default function ChatSidebarNav({
   });
 
   const handleLogout = () => {
+    setIsAccountMenuOpen(false);
     setLogoutModalOpen(true);
   };
 
@@ -206,14 +231,150 @@ export default function ChatSidebarNav({
     setActiveMenu(null);
   };
 
+  if (collapsed) {
+    return (
+      <div className="w-16 h-full relative flex flex-col">
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+          }}
+        />
+
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, #475569 1px, transparent 1px),
+              linear-gradient(to bottom, #475569 1px, transparent 1px)
+            `,
+            backgroundSize: "40px 40px",
+          }}
+        />
+
+        <div className="relative z-10 flex flex-col items-center h-full py-4 border-r border-slate-200/80">
+          <button
+            onClick={onToggleSidebar}
+            className="group relative w-10 h-10 rounded-xl border border-slate-300 bg-white hover:border-slate-400 transition-colors"
+            title="Mở lịch sử trò chuyện"
+          >
+            <span className="absolute inset-0 flex items-center justify-center text-sm font-serif font-medium text-slate-700 transition-opacity group-hover:opacity-0">
+              W
+            </span>
+            <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <svg
+                className="w-5 h-5 text-slate-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                />
+              </svg>
+            </span>
+          </button>
+
+          <button
+            onClick={onNewChat}
+            className="mt-4 w-10 h-10 flex items-center justify-center rounded-xl text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+            title="Trò chuyện mới"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          </button>
+
+          <div className="mt-auto relative" ref={accountMenuRef}>
+            <button
+              onClick={() => setIsAccountMenuOpen((prev) => !prev)}
+              className="w-10 h-10 bg-slate-200 flex items-center justify-center text-slate-700 font-serif text-sm rounded-xl hover:bg-slate-300 transition-colors"
+              aria-haspopup="menu"
+              aria-expanded={isAccountMenuOpen}
+              title="Tài khoản"
+            >
+              {user?.fullName?.[0]?.toUpperCase() ||
+                user?.username?.[0]?.toUpperCase() ||
+                user?.email?.[0]?.toUpperCase() ||
+                "U"}
+            </button>
+
+            {isAccountMenuOpen && (
+              <div className="absolute bottom-0 left-full ml-2 w-44 bg-white/95 backdrop-blur-sm border border-slate-200 py-1.5 z-50 shadow-xl rounded-lg">
+                {user?.role?.toLowerCase() === "admin" && (
+                  <Link
+                    href={ROUTES.ADMIN}
+                    onClick={() => setIsAccountMenuOpen(false)}
+                    className="w-full px-4 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-800 flex items-center gap-3 transition-colors rounded-md"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    Quản trị hệ thống
+                  </Link>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-3 transition-colors rounded-md"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"
+                    />
+                  </svg>
+                  Đăng xuất
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-72 h-full relative flex flex-col overflow-visible">
       {/* Background */}
       <div
         className="absolute inset-0"
         style={{
-          background:
-            "linear-gradient(180deg, #1e293b 0%, #0f172a 50%, #020617 100%)",
+          background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
         }}
       />
 
@@ -232,30 +393,57 @@ export default function ChatSidebarNav({
       {/* Content */}
       <div className="relative z-10 flex flex-col h-full">
         {/* Header */}
-        <div className="p-5 border-b border-white/8">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="relative">
-              <div className="w-9 h-9 border border-white/15 rounded-lg" />
-              <div className="absolute inset-1.5 bg-white/5 rounded" />
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-serif font-medium text-white/80">
-                W
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-serif font-medium text-white/90 tracking-wide">
-                WikiChatbot
-              </span>
-              <span className="text-[9px] text-white/35 uppercase tracking-[0.15em]">
-                Danh nhân Việt Nam
-              </span>
-            </div>
+        <div className="p-5 border-b border-slate-200/80">
+          <div className="flex items-start justify-between gap-2 mb-5">
+            <Link
+              href={ROUTES.HOME}
+              className="flex items-center gap-3 min-w-0"
+            >
+              <div className="relative shrink-0">
+                <div className="w-9 h-9 border border-slate-300 rounded-lg" />
+                <div className="absolute inset-1.5 bg-slate-100 rounded" />
+                <span className="absolute inset-0 flex items-center justify-center text-sm font-serif font-medium text-slate-700">
+                  W
+                </span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-serif font-medium text-slate-800 tracking-wide truncate">
+                  WikichatbotAI
+                </span>
+                <span className="text-[9px] text-slate-400 uppercase tracking-[0.15em] truncate">
+                  Hỏi đáp về danh nhân
+                </span>
+              </div>
+            </Link>
+
+            {onToggleSidebar && (
+              <button
+                onClick={onToggleSidebar}
+                className="hidden md:inline-flex w-9 h-9 border border-slate-300 text-slate-600 hover:text-slate-800 hover:bg-slate-100 hover:border-slate-400 items-center justify-center transition-colors rounded-lg shrink-0"
+                title="Thu gọn thanh lịch sử"
+              >
+                <svg
+                  className="w-4.5 h-4.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 5.25h16.5a1.5 1.5 0 011.5 1.5v10.5a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5V6.75a1.5 1.5 0 011.5-1.5zM8.25 5.25v13.5"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* New Chat & Search - Bo tròn nhẹ */}
           <div className="flex items-center gap-2">
             <button
               onClick={onNewChat}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/10 border border-white/15 text-white/90 hover:bg-white/15 hover:border-white/25 transition-all text-sm font-medium tracking-wide rounded-lg"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 border border-slate-200 text-slate-800 hover:bg-slate-200 hover:border-slate-300 transition-all text-sm font-medium tracking-wide rounded-lg"
             >
               <svg
                 className="w-4 h-4"
@@ -273,7 +461,7 @@ export default function ChatSidebarNav({
               Trò chuyện mới
             </button>
 
-            <button className="w-11 h-11 border border-white/15 text-white/50 flex items-center justify-center hover:bg-white/10 hover:text-white/80 transition-colors rounded-lg">
+            <button className="w-11 h-11 border border-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-100 hover:text-slate-700 transition-colors rounded-lg">
               <svg
                 className="w-4 h-4"
                 fill="none"
@@ -296,15 +484,15 @@ export default function ChatSidebarNav({
           <div>
             <div className="flex items-center justify-between mb-4 px-1">
               <div className="flex items-center gap-3">
-                <div className="w-5 h-px bg-white/15" />
-                <h3 className="text-[10px] font-medium text-white/35 uppercase tracking-[0.2em]">
+                <div className="w-5 h-px bg-slate-200" />
+                <h3 className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.2em]">
                   Lịch sử
                 </h3>
               </div>
               {conversationsData.length > 0 && (
                 <button
                   onClick={openClearAllModal}
-                  className="text-[10px] text-white/25 hover:text-white/50 uppercase tracking-wider transition-colors"
+                  className="text-[10px] text-slate-400 hover:text-slate-600 uppercase tracking-wider transition-colors"
                 >
                   Xóa tất cả
                 </button>
@@ -314,11 +502,11 @@ export default function ChatSidebarNav({
             {/* Loading state */}
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
               </div>
             ) : conversations.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-[11px] text-white/30 italic">
+                <p className="text-[11px] text-slate-400 italic">
                   Chưa có lịch sử trò chuyện
                 </p>
               </div>
@@ -330,8 +518,8 @@ export default function ChatSidebarNav({
                       onClick={() => onSelectChat?.(conv.id)}
                       className={`w-full text-left px-3 py-2.5 text-sm transition-all rounded-lg ${
                         currentChat === conv.id
-                          ? "bg-white/8 text-white/85 border border-white/10"
-                          : "text-white/50 hover:bg-white/5 hover:text-white/70 border border-transparent"
+                          ? "bg-slate-100 text-slate-800 border border-slate-200"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent"
                       }`}
                     >
                       <div className="flex items-center gap-3 pr-8">
@@ -358,7 +546,7 @@ export default function ChatSidebarNav({
                               if (e.key === "Enter") handleSaveRename(conv.id);
                               if (e.key === "Escape") setEditingId(null);
                             }}
-                            className="flex-1 bg-white/10 border border-white/20 px-2 py-0.5 text-sm text-white focus:outline-none rounded"
+                            className="flex-1 bg-white border border-slate-300 px-2 py-0.5 text-sm text-slate-800 focus:outline-none rounded"
                             autoFocus
                           />
                         ) : (
@@ -368,7 +556,7 @@ export default function ChatSidebarNav({
                         )}
                         {conv.pinned && (
                           <svg
-                            className="w-3 h-3 text-white/35 shrink-0"
+                            className="w-3 h-3 text-slate-400 shrink-0"
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -382,7 +570,7 @@ export default function ChatSidebarNav({
                     <div className="absolute right-2 top-1/2 -translate-y-1/2">
                       <button
                         onClick={(e) => handleMenuToggle(conv.id, e)}
-                        className="w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white/35 hover:text-white/60 hover:bg-white/10 rounded"
+                        className="w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded"
                       >
                         <svg
                           className="w-4 h-4"
@@ -401,57 +589,34 @@ export default function ChatSidebarNav({
         </div>
 
         {/* Footer - User Profile Only (No Settings) */}
-        <div className="p-4 border-t border-white/8">
-          {/* Admin Panel link — only for admin users */}
-          {user?.role?.toLowerCase() === "admin" && (
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3 py-2.5 mb-3 text-sm text-white/50 hover:bg-white/5 hover:text-white/70 rounded-lg transition-all border border-transparent"
-            >
-              <svg
-                className="w-4.5 h-4.5 shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              <span className="font-light">Quản trị hệ thống</span>
-            </Link>
-          )}
-
-          {/* Logged In User - Bo tròn nhẹ */}
-          <div className="flex items-center gap-3 px-3 py-3 bg-white/5 border border-white/8 rounded-lg">
-            <div className="w-9 h-9 bg-slate-600/80 flex items-center justify-center text-white/80 font-serif text-sm rounded-lg">
-              {user?.fullName?.[0]?.toUpperCase() ||
-                user?.username?.[0]?.toUpperCase() ||
-                user?.email?.[0]?.toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-white/85 truncate font-medium">
-                {user?.fullName || user?.username || user?.email?.split("@")[0]}
-              </p>
-              <p className="text-[10px] text-white/35 truncate">
-                {user?.email}
-              </p>
-            </div>
+        <div className="p-4 border-t border-slate-200/80">
+          <div className="relative" ref={accountMenuRef}>
             <button
-              onClick={handleLogout}
-              className="w-8 h-8 border border-white/10 hover:border-white/20 hover:bg-white/5 flex items-center justify-center text-white/35 hover:text-white/60 transition-all rounded-lg"
-              title="Đăng xuất"
+              onClick={() => setIsAccountMenuOpen((prev) => !prev)}
+              className="w-full flex items-center gap-3 px-3 py-3 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              aria-haspopup="menu"
+              aria-expanded={isAccountMenuOpen}
+              title="Tài khoản"
             >
+              <div className="w-9 h-9 bg-slate-300 flex items-center justify-center text-slate-700 font-serif text-sm rounded-lg">
+                {user?.fullName?.[0]?.toUpperCase() ||
+                  user?.username?.[0]?.toUpperCase() ||
+                  user?.email?.[0]?.toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm text-slate-800 truncate font-medium">
+                  {user?.fullName ||
+                    user?.username ||
+                    user?.email?.split("@")[0]}
+                </p>
+                <p className="text-[10px] text-slate-500 truncate">
+                  {user?.email}
+                </p>
+              </div>
               <svg
-                className="w-4 h-4"
+                className={`w-4 h-4 text-slate-500 transition-transform ${
+                  isAccountMenuOpen ? "rotate-180" : ""
+                }`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -460,10 +625,61 @@ export default function ChatSidebarNav({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"
+                  d="M19 9l-7 7-7-7"
                 />
               </svg>
             </button>
+
+            {isAccountMenuOpen && (
+              <div className="absolute bottom-full left-0 mb-2 w-full bg-white/95 backdrop-blur-sm border border-slate-200 py-1.5 z-50 shadow-xl rounded-lg">
+                {user?.role?.toLowerCase() === "admin" && (
+                  <Link
+                    href={ROUTES.ADMIN}
+                    onClick={() => setIsAccountMenuOpen(false)}
+                    className="w-full px-4 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-800 flex items-center gap-3 transition-colors rounded-md"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    Quản trị hệ thống
+                  </Link>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-3 transition-colors rounded-md"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"
+                    />
+                  </svg>
+                  Đăng xuất
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -472,7 +688,7 @@ export default function ChatSidebarNav({
       {activeMenu && (
         <div
           ref={menuRef}
-          className="fixed w-44 bg-slate-800/95 backdrop-blur-sm border border-white/10 py-1.5 z-[9999] shadow-xl rounded-lg"
+          className="fixed w-44 bg-white/95 backdrop-blur-sm border border-slate-200 py-1.5 z-9999 shadow-xl rounded-lg"
           style={{
             top: `${menuPosition.top}px`,
             left: `${menuPosition.left}px`,
@@ -485,7 +701,7 @@ export default function ChatSidebarNav({
               );
               if (conv && activeMenu) handleRename(activeMenu, conv.title);
             }}
-            className="w-full px-4 py-2.5 text-left text-sm text-white/60 hover:bg-white/8 hover:text-white/85 flex items-center gap-3 transition-colors mx-1 rounded-md"
+            className="w-full px-4 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-800 flex items-center gap-3 transition-colors mx-1 rounded-md"
             style={{ width: "calc(100% - 8px)" }}
           >
             <svg
@@ -505,7 +721,7 @@ export default function ChatSidebarNav({
           </button>
           <button
             onClick={() => activeMenu && handlePin(activeMenu)}
-            className="w-full px-4 py-2.5 text-left text-sm text-white/60 hover:bg-white/8 hover:text-white/85 flex items-center gap-3 transition-colors mx-1 rounded-md"
+            className="w-full px-4 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-800 flex items-center gap-3 transition-colors mx-1 rounded-md"
             style={{ width: "calc(100% - 8px)" }}
           >
             <svg
@@ -525,7 +741,7 @@ export default function ChatSidebarNav({
               ? "Bỏ ghim"
               : "Ghim đoạn chat"}
           </button>
-          <div className="my-1.5 mx-2 border-t border-white/8" />
+          <div className="my-1.5 mx-2 border-t border-slate-200" />
           <button
             onClick={() => activeMenu && openDeleteModal(activeMenu)}
             className="w-full px-4 py-2.5 text-left text-sm text-red-400/80 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-3 transition-colors mx-1 rounded-md"

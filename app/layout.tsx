@@ -15,9 +15,9 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Entrepreneur AI - Learn from the Best",
+  title: "WikichatbotAI-Hỏi đáp về danh nhân",
   description:
-    "Discover the stories behind success. Chat with AI to learn about world-renowned entrepreneurs like Steve Jobs, Elon Musk, and more using advanced RAG technology.",
+    "WikichatbotAI là một chatbot AI để tìm kiếm thông tin, giải đáp các câu hỏi về danh nhân Việt Nam và trên thế giới.",
 };
 
 export default function RootLayout({

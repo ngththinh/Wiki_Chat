@@ -117,11 +117,11 @@ export default function DocumentsTab() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className="flex-1">
             <h3 className="text-sm font-medium text-slate-700 mb-1">
-              Upload tài liệu
+              Upload Danh Nhân
             </h3>
             <p className="text-[11px] text-slate-400">
-              Hỗ trợ PDF, TXT, DOCX. Tài liệu sẽ được xử lý và chia thành các
-              đoạn text.
+              Hỗ trợ PDF, TXT, DOCX. Dữ liệu danh nhân sẽ được xử lý và chia
+              thành các đoạn text.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -198,7 +198,7 @@ export default function DocumentsTab() {
               />
             </svg>
             <p className="text-sm text-slate-400 italic">
-              Chưa có tài liệu nào
+              Chưa có danh nhân nào
             </p>
           </div>
         ) : (
@@ -254,7 +254,7 @@ export default function DocumentsTab() {
                   <button
                     onClick={() => handleDelete(doc.id)}
                     className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                    title="Xóa tài liệu"
+                    title="Xóa danh nhân"
                   >
                     <svg
                       className="w-4 h-4"
@@ -280,8 +280,8 @@ export default function DocumentsTab() {
       {/* Delete confirm */}
       <ConfirmModal
         isOpen={deleteModalOpen}
-        title="Xóa tài liệu"
-        message="Bạn có chắc chắn muốn xóa tài liệu này? Hành động không thể hoàn tác."
+        title="Xóa danh nhân"
+        message="Bạn có chắc chắn muốn xóa danh nhân này? Hành động không thể hoàn tác."
         confirmText="Xóa"
         cancelText="Hủy"
         variant="danger"

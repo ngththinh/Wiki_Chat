@@ -1,3 +1,5 @@
+import authService from './authService';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
 
 export interface ApiResponse<T> {
@@ -13,7 +15,7 @@ export const apiClient = {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
-      const token = localStorage.getItem('authToken');
+      const token = authService.getToken();
       
       const headers: HeadersInit = {
         'Content-Type': 'application/json',

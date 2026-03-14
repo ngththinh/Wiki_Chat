@@ -7,12 +7,14 @@ interface ChatMessagesProps {
   messages: Message[];
   isLoading: boolean;
   onRegenerate: () => void;
+  onSuggestionClick: (question: string) => void;
 }
 
 export default function ChatMessages({
   messages,
   isLoading,
   onRegenerate,
+  onSuggestionClick,
 }: ChatMessagesProps) {
   const hasMessages = messages.length > 0;
   const lastMessage = messages[messages.length - 1];
@@ -55,20 +57,23 @@ export default function ChatMessages({
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-serif font-bold text-slate-800 mb-3">
-              Chào mừng đến với WikiChatbot
+              Chào mừng đến với WikichatbotAI
             </h2>
-            <p className="text-slate-500 max-w-md mb-8 sm:mb-10 text-sm leading-relaxed px-2">
-              Hỏi tôi bất cứ điều gì về các danh nhân Việt Nam.
-              <br />
-              <span className="italic">
-                Tôi luôn sẵn sàng giúp bạn khám phá lịch sử và tri thức.
-              </span>
+            <p className="text-slate-500 max-w-2xl mb-8 sm:mb-10 text-sm leading-relaxed px-2">
+              WikichatbotAI là một chatbot AI để tìm kiếm thông tin, giải đáp
+              các câu hỏi về danh nhân Việt Nam và trên thế giới.
             </p>
 
             {/* Suggestion Cards - Editorial style */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full max-w-2xl">
               {SUGGESTION_CARDS.map((card, index) => (
-                <SuggestionCard key={index} icon={card.icon} text={card.text} />
+                <SuggestionCard
+                  key={index}
+                  icon={card.icon}
+                  text={card.text}
+                  disabled={isLoading}
+                  onClick={() => onSuggestionClick(card.text)}
+                />
               ))}
             </div>
           </div>
@@ -137,9 +142,23 @@ export default function ChatMessages({
 }
 
 // Suggestion Card Component - Editorial style
-function SuggestionCard({ icon, text }: { icon: string; text: string }) {
+function SuggestionCard({
+  icon,
+  text,
+  onClick,
+  disabled,
+}: {
+  icon: string;
+  text: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <button className="group relative overflow-hidden text-left rounded-xl">
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="group relative overflow-hidden text-left rounded-xl disabled:opacity-60 disabled:cursor-not-allowed"
+    >
       {/* Glass background */}
       <div className="absolute inset-0 bg-white/50 backdrop-blur-sm border border-slate-200/80 group-hover:border-slate-400 group-hover:bg-white/80 transition-all rounded-xl shadow-sm"></div>
 
