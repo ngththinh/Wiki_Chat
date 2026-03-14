@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import authService from "@/lib/authService";
 
 // ==================== DATA ====================
 const CATEGORIES = [
@@ -62,6 +65,68 @@ const CATEGORIES = [
 
 // ==================== HEADER ====================
 function Header() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const syncAuthState = () => {
+      const user = authService.getCurrentUser();
+      const hasToken = authService.isAuthenticated();
+      setCurrentUser(user);
+      setIsAuthenticated(hasToken);
+    };
+
+    syncAuthState();
+    window.addEventListener("focus", syncAuthState);
+    return () => window.removeEventListener("focus", syncAuthState);
+  }, []);
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsAccountMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEsc);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [isAccountMenuOpen]);
+
+  const displayName =
+    currentUser?.fullName ||
+    currentUser?.username ||
+    currentUser?.email?.split("@")[0] ||
+    "Người dùng";
+  const avatarLetter = String(displayName).trim().charAt(0).toUpperCase();
+  const isAdmin = currentUser?.role?.toLowerCase() === "admin";
+
+  const handleLogout = () => {
+    authService.logout();
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setIsAccountMenuOpen(false);
+    router.push("/");
+  };
+
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50"
@@ -74,17 +139,13 @@ function Header() {
       }}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-        {/* Logo - Understated editorial */}
         <Link
           href="/"
           className="flex items-center space-x-2 sm:space-x-3 opacity-80 hover:opacity-100 transition-opacity duration-300"
         >
           <div className="relative">
-            {/* Minimal frame */}
             <div className="w-8 h-8 border border-slate-300/60 rounded-lg"></div>
-            {/* Inner accent - muted */}
             <div className="absolute inset-1.5 bg-slate-700/90 rounded-md"></div>
-            {/* Letter W */}
             <span className="absolute inset-0 flex items-center justify-center text-[10px] font-serif font-medium text-white/90">
               W
             </span>
@@ -99,35 +160,99 @@ function Header() {
           </div>
         </Link>
 
-        {/* Navigation - Low contrast, understated */}
         <nav className="flex items-center space-x-3 sm:space-x-6">
-          <Link
-            href="/login"
-            className="text-[11px] sm:text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors duration-300 tracking-wide"
-          >
-            Đăng nhập
-          </Link>
-          <Link
-            href="/register"
-            className="group flex items-center gap-1.5 text-[11px] sm:text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors duration-300"
-          >
-            <span className="border-b border-slate-400/50 group-hover:border-slate-600 pb-px">
-              Đăng ký
-            </span>
-            <svg
-              className="w-3 h-3 opacity-60 group-hover:opacity-100 transform group-hover:translate-x-0.5 transition-all"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M17 8l4 4m0 0l-4 4m4-4H3"
-              />
-            </svg>
-          </Link>
+          {isAuthenticated ? (
+            <div className="relative" ref={accountMenuRef}>
+              <button
+                onClick={() => setIsAccountMenuOpen((prev) => !prev)}
+                className="group flex items-center gap-2.5 px-2.5 sm:px-3 py-1.5 border border-slate-300/70 bg-white/70 hover:bg-white transition-colors rounded-lg"
+                title="Tài khoản"
+                aria-haspopup="menu"
+                aria-expanded={isAccountMenuOpen}
+              >
+                <div className="w-7 h-7 rounded-md bg-slate-700 text-white text-[11px] font-medium flex items-center justify-center">
+                  {avatarLetter || "U"}
+                </div>
+                <div className="hidden sm:flex items-center gap-2 leading-tight">
+                  <span className="text-xs font-medium text-slate-700 max-w-[150px] truncate">
+                    {displayName}
+                  </span>
+                  <svg
+                    className={`w-3.5 h-3.5 text-slate-500 transition-transform ${
+                      isAccountMenuOpen ? "rotate-180" : ""
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </div>
+              </button>
+
+              {isAccountMenuOpen && (
+                <div className="absolute right-0 mt-2 w-44 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                  <Link
+                    href="/chat"
+                    onClick={() => setIsAccountMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100/80 transition-colors"
+                  >
+                    <span>Vào trò chuyện</span>
+                  </Link>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsAccountMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100/80 transition-colors"
+                    >
+                      <span>Quản trị hệ thống</span>
+                    </Link>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-[11px] sm:text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors duration-300 tracking-wide"
+              >
+                Đăng nhập
+              </Link>
+              <Link
+                href="/register"
+                className="group flex items-center gap-1.5 text-[11px] sm:text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors duration-300"
+              >
+                <span className="border-b border-slate-400/50 group-hover:border-slate-600 pb-px">
+                  Đăng ký
+                </span>
+                <svg
+                  className="w-3 h-3 opacity-60 group-hover:opacity-100 transform group-hover:translate-x-0.5 transition-all"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M17 8l4 4m0 0l-4 4m4-4H3"
+                  />
+                </svg>
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </header>

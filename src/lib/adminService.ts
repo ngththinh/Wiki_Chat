@@ -1,3 +1,5 @@
+import authService from './authService';
+
 // Admin API Service
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
 
@@ -113,11 +115,16 @@ interface ApiResponse<T> {
 
 // Helper function to get auth header
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('authToken');
-  return {
+  const token = authService.getToken();
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
   };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
 };
 
 // Helper to safely parse JSON from response (handles empty/non-JSON bodies)
@@ -470,7 +477,11 @@ export const adminService = {
   // Upload document
   async uploadDocument(file: File, chunkSize: number = 800, chunkOverlap: number = 150): Promise<ApiResponse<DocumentUploadResponse>> {
     try {
-      const token = localStorage.getItem('authToken');
+      const token = authService.getToken();
+      if (!token) {
+        return { success: false, error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' };
+      }
+
       const formData = new FormData();
       formData.append('file', file);
 

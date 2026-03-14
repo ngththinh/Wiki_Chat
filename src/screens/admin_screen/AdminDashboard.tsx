@@ -19,7 +19,7 @@ const tabLabels: Record<TabType, string> = {
   dashboard: "Tổng quan",
   users: "Người dùng",
   sessions: "Phiên chat",
-  documents: "Tài liệu",
+  documents: "Danh Nhân",
 };
 
 export default function AdminDashboard() {
@@ -27,6 +27,8 @@ export default function AdminDashboard() {
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
+    useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Overview data
@@ -132,6 +134,8 @@ export default function AdminDashboard() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
+          collapsed={!isMobileSidebarOpen && isDesktopSidebarCollapsed}
+          onToggleSidebar={() => setIsDesktopSidebarCollapsed((prev) => !prev)}
         />
       </div>
 

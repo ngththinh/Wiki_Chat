@@ -16,6 +16,8 @@ import {
 } from "@/utils/chat";
 import { ChatModel, detectModelFromSubdomain } from "@/utils/subdomain";
 
+const CHAT_SIDEBAR_VISIBILITY_KEY = "chatSidebarVisibleDesktop";
+
 export default function ChatScreen() {
   const [user, setUser] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(true);
@@ -28,6 +30,9 @@ export default function ChatScreen() {
   const [isSubdomainModel, setIsSubdomainModel] = useState(false);
   const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isDesktopSidebarVisible, setIsDesktopSidebarVisible] = useState(true);
+  const [prefillMessage, setPrefillMessage] = useState<string | null>(null);
+  const [prefillNonce, setPrefillNonce] = useState(0);
 
   // Detect subdomain and set model accordingly
   useEffect(() => {
@@ -39,9 +44,17 @@ export default function ChatScreen() {
   // Check authentication and load messages
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
+    const hasToken = authService.isAuthenticated();
 
-    if (currentUser) {
-      setUser(currentUser);
+    if (currentUser || hasToken) {
+      setUser(
+        currentUser || {
+          username: "Người dùng",
+          fullName: null,
+          email: "",
+          role: "user",
+        },
+      );
       setIsGuest(false);
       setMessages([]);
     } else {
@@ -49,6 +62,23 @@ export default function ChatScreen() {
       setMessages([]);
     }
   }, []);
+
+  // Load sidebar visibility preference once.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem(CHAT_SIDEBAR_VISIBILITY_KEY);
+    if (saved === null) return;
+    setIsDesktopSidebarVisible(saved !== "false");
+  }, []);
+
+  // Persist sidebar visibility preference for authenticated chat layout.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      CHAT_SIDEBAR_VISIBILITY_KEY,
+      String(isDesktopSidebarVisible),
+    );
+  }, [isDesktopSidebarVisible]);
 
   const handleSendMessage = async (message: string, model: ChatModel) => {
     if (!message.trim()) return;
@@ -202,6 +232,19 @@ export default function ChatScreen() {
     }
   };
 
+  const handleSuggestionClick = (question: string) => {
+    if (isLoading) return;
+    setPrefillMessage(question);
+    setPrefillNonce((prev) => prev + 1);
+  };
+
+  const toggleDesktopSidebar = () => {
+    setIsDesktopSidebarVisible((prev) => !prev);
+  };
+
+  const shouldRenderSidebar = !isGuest;
+  const isSidebarCollapsed = !isDesktopSidebarVisible && !isMobileSidebarOpen;
+
   return (
     <div className="flex h-screen relative overflow-hidden">
       {/* Background - Editorial gradient */}
@@ -226,10 +269,10 @@ export default function ChatScreen() {
       />
 
       {/* Glass editorial layer */}
-      <div className="absolute inset-0 bg-slate-700/[0.01] backdrop-blur-[0.2px]" />
+      <div className="absolute inset-0 bg-slate-700/1 backdrop-blur-[0.2px]" />
 
       {/* Sidebar - Only show when logged in */}
-      {!isGuest && (
+      {shouldRenderSidebar && (
         <>
           {/* Mobile sidebar overlay */}
           {isMobileSidebarOpen && (
@@ -257,6 +300,8 @@ export default function ChatScreen() {
               }}
               currentChat={currentChat}
               refreshTrigger={sidebarRefreshTrigger}
+              collapsed={isSidebarCollapsed}
+              onToggleSidebar={toggleDesktopSidebar}
             />
           </div>
         </>
@@ -279,10 +324,10 @@ export default function ChatScreen() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-sm font-serif font-medium text-slate-800 tracking-wide">
-                    WikiChatbot
+                    WikichatbotAI
                   </span>
                   <span className="text-[9px] text-slate-400 uppercase tracking-[0.15em]">
-                    Trí tuệ nhân tạo
+                    Hỏi đáp về danh nhân
                   </span>
                 </div>
               </Link>
@@ -336,7 +381,7 @@ export default function ChatScreen() {
               </button>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-serif font-medium text-slate-700">
-                  WikiChatbot
+                  WikichatbotAI
                 </span>
               </div>
               <button
@@ -366,6 +411,7 @@ export default function ChatScreen() {
           messages={messages}
           isLoading={isLoading}
           onRegenerate={handleRegenerateResponse}
+          onSuggestionClick={handleSuggestionClick}
         />
 
         {/* Chat Input */}
@@ -375,6 +421,8 @@ export default function ChatScreen() {
           selectedModel={selectedModel}
           onModelChange={handleModelChange}
           isSubdomainModel={isSubdomainModel}
+          prefillMessage={prefillMessage}
+          prefillNonce={prefillNonce}
         />
       </div>
     </div>
