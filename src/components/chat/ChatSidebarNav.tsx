@@ -16,11 +16,7 @@ interface ChatSidebarNavProps {
   refreshTrigger?: number;
   collapsed?: boolean;
   onToggleSidebar?: () => void;
-  optimisticConversation?: {
-    id: string;
-    title: string;
-    timestamp: Date;
-  } | null;
+  isPendingConversation?: boolean;
 }
 
 interface Conversation {
@@ -39,7 +35,7 @@ export default function ChatSidebarNav({
   refreshTrigger = 0,
   collapsed = false,
   onToggleSidebar,
-  optimisticConversation = null,
+  isPendingConversation = false,
 }: ChatSidebarNavProps) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -137,20 +133,7 @@ export default function ChatSidebarNav({
     }),
   );
 
-  const mergedConversations = [...allConversationsData];
-  if (
-    optimisticConversation &&
-    !mergedConversations.some((conv) => conv.id === optimisticConversation.id)
-  ) {
-    mergedConversations.unshift({
-      id: optimisticConversation.id,
-      title: optimisticConversation.title,
-      timestamp: optimisticConversation.timestamp,
-      pinned: false,
-    });
-  }
-
-  const conversations = [...mergedConversations].sort((a, b) => {
+  const conversations = [...allConversationsData].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
     return b.timestamp.getTime() - a.timestamp.getTime();
@@ -523,21 +506,41 @@ export default function ChatSidebarNav({
               <div className="flex items-center justify-center py-8">
                 <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
               </div>
-            ) : conversations.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-[11px] text-slate-400 italic">
-                  Chưa có lịch sử trò chuyện
-                </p>
-              </div>
             ) : (
               <div className="space-y-1">
+                {isPendingConversation && (
+                  <div className="relative px-3 py-2.5 rounded-lg border border-dashed border-slate-300 bg-slate-50/70 animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <svg
+                        className="w-4 h-4 shrink-0 opacity-40 text-slate-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+                        />
+                      </svg>
+                      <div className="flex-1 h-4 rounded bg-slate-300/50" />
+                    </div>
+                  </div>
+                )}
+
+                {conversations.length === 0 && !isPendingConversation && (
+                  <div className="text-center py-8">
+                    <p className="text-[11px] text-slate-400 italic">
+                      Chưa có lịch sử trò chuyện
+                    </p>
+                  </div>
+                )}
+
                 {conversations.map((conv) => (
                   <div key={conv.id} className="relative group">
                     <button
-                      onClick={() => {
-                        if (conv.id.startsWith("temp-")) return;
-                        onSelectChat?.(conv.id);
-                      }}
+                      onClick={() => onSelectChat?.(conv.id)}
                       className={`w-full text-left px-3 py-2.5 text-sm transition-all rounded-lg ${
                         currentChat === conv.id
                           ? "bg-slate-100 text-slate-800 border border-slate-200"
