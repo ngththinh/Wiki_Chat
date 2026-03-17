@@ -6,7 +6,6 @@ import { apiClient, ApiResponse } from './apiClient';
 
 // ChatSessionDto - response from /api/history/sessions
 export interface ChatSessionDto {
-  id: number;
   sessionId: string;
   sessionName: string;
   createdAt: string;
@@ -15,7 +14,6 @@ export interface ChatSessionDto {
 
 // SessionSummaryDto - from GET /api/history/sessions
 export interface SessionSummaryDto {
-  id: number;
   sessionId: string;
   sessionName: string;
   createdAt: string;
@@ -25,8 +23,8 @@ export interface SessionSummaryDto {
 
 // ChatHistoryDto - message in a session
 export interface ChatHistoryDto {
-  id: number;
-  sessionId: number;
+  id: string;
+  sessionId: string;
   question: string;
   answer: string;
   createdAt: string;
@@ -45,7 +43,7 @@ export interface UpdateChatSessionDto {
 
 // CreateChatHistoryDto - POST /api/history/messages
 export interface CreateChatHistoryDto {
-  sessionId: number;
+  sessionId: string;
   question: string;
   answer: string;
 }
@@ -79,15 +77,103 @@ export interface UpdateConversationRequest {
 
 // Helper to convert SessionSummaryDto to Conversation
 function sessionToConversation(session: SessionSummaryDto): Conversation {
+  const safeCreatedAt = session.createdAt || new Date().toISOString();
+  const safeLastMessageAt = session.lastMessageAt || safeCreatedAt;
+
   return {
-    id: session.id.toString(),
-    title: session.sessionName || `Cuộc trò chuyện ${session.id}`,
-    timestamp: new Date(session.lastMessageAt || session.createdAt),
+    id: session.sessionId,
+    title: session.sessionName || 'Cuộc trò chuyện mới',
+    timestamp: new Date(safeLastMessageAt),
     pinned: false, // Backend không có field này
     lastMessage: undefined,
-    messageCount: session.messageCount,
+    messageCount: session.messageCount || 0,
   };
 }
+
+const normalizeSessionSummary = (item: any): SessionSummaryDto | null => {
+  if (!item || typeof item !== 'object') return null;
+
+  const sessionId = item.sessionId || item.session_id || item.SessionId;
+
+  if (!sessionId) return null;
+
+  const createdAt = item.createdAt || item.created_at || item.CreatedAt || new Date().toISOString();
+  const lastMessageAt =
+    item.lastMessageAt || item.last_message_at || item.LastMessageAt || item.updatedAt || item.updated_at || item.UpdatedAt || createdAt;
+
+  return {
+    sessionId,
+    sessionName: item.sessionName || item.session_name || item.SessionName || 'Cuộc trò chuyện mới',
+    createdAt,
+    lastMessageAt,
+    messageCount: Number(item.messageCount ?? item.message_count ?? item.MessageCount ?? 0),
+  };
+};
+
+const isSessionLike = (item: unknown): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  const record = item as Record<string, unknown>;
+  const hasSessionId =
+    record.sessionId !== undefined ||
+    record.session_id !== undefined ||
+    record.SessionId !== undefined;
+  return hasSessionId;
+};
+
+const findSessionArrayDeep = (raw: unknown, depth: number = 0): unknown[] | null => {
+  if (depth > 5 || raw === null || raw === undefined) return null;
+
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return raw;
+    if (raw.some(isSessionLike)) return raw;
+
+    for (const item of raw) {
+      const nested = findSessionArrayDeep(item, depth + 1);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  if (typeof raw !== 'object') return null;
+  const record = raw as Record<string, unknown>;
+
+  const preferredKeys = [
+    'items',
+    'Items',
+    'sessions',
+    'Sessions',
+    'results',
+    'Results',
+    'list',
+    'List',
+    'value',
+    'Value',
+    'data',
+    'Data',
+  ];
+
+  for (const key of preferredKeys) {
+    if (!(key in record)) continue;
+    const nested = findSessionArrayDeep(record[key], depth + 1);
+    if (nested) return nested;
+  }
+
+  for (const value of Object.values(record)) {
+    const nested = findSessionArrayDeep(value, depth + 1);
+    if (nested) return nested;
+  }
+
+  return null;
+};
+
+const extractSessionSummaryList = (raw: unknown): SessionSummaryDto[] => {
+  const sessionsRaw = findSessionArrayDeep(raw);
+  if (!sessionsRaw) return [];
+
+  return sessionsRaw
+    .map(normalizeSessionSummary)
+    .filter((session): session is SessionSummaryDto => session !== null);
+};
 
 // =====================
 // History Service - matching Backend API
@@ -95,7 +181,18 @@ function sessionToConversation(session: SessionSummaryDto): Conversation {
 export const historyService = {
   // Get all sessions - GET /api/history/sessions
   async getSessions(): Promise<ApiResponse<SessionSummaryDto[]>> {
-    return apiClient.get<SessionSummaryDto[]>('/history/sessions');
+    const response = await apiClient.get<unknown>('/history/sessions');
+    if (!response.success) {
+      return {
+        success: false,
+        error: response.error,
+      };
+    }
+
+    return {
+      success: true,
+      data: extractSessionSummaryList(response.data),
+    };
   },
 
   // Get all conversations (legacy wrapper)
@@ -117,11 +214,9 @@ export const historyService = {
 
   // Create new session - POST /api/history/sessions
   async createSession(sessionName?: string, sessionId?: string): Promise<ApiResponse<ChatSessionDto>> {
-    // Generate unique sessionId if not provided
-    const uniqueSessionId = sessionId || `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    
     const request: CreateChatSessionDto = {
-      sessionId: uniqueSessionId,
+      // Let backend generate UUID when sessionId is not provided.
+      sessionId,
       sessionName: sessionName || 'Cuộc trò chuyện mới',
     };
     return apiClient.post<ChatSessionDto>('/history/sessions', request);
@@ -135,8 +230,8 @@ export const historyService = {
         success: true,
         data: {
           conversation: {
-            id: response.data.id.toString(),
-            title: response.data.sessionName || `Cuộc trò chuyện ${response.data.id}`,
+            id: response.data.sessionId,
+            title: response.data.sessionName || 'Cuộc trò chuyện mới',
             timestamp: new Date(response.data.createdAt),
             pinned: false,
           },
@@ -150,12 +245,12 @@ export const historyService = {
   },
 
   // Get session by ID - GET /api/history/sessions/{sessionId}
-  async getSession(sessionId: number): Promise<ApiResponse<ChatSessionDto>> {
+  async getSession(sessionId: string): Promise<ApiResponse<ChatSessionDto>> {
     return apiClient.get<ChatSessionDto>(`/history/sessions/${sessionId}`);
   },
 
   // Update session - PUT /api/history/sessions/{sessionId}
-  async updateSession(sessionId: number, sessionName: string): Promise<ApiResponse<ChatSessionDto>> {
+  async updateSession(sessionId: string, sessionName: string): Promise<ApiResponse<ChatSessionDto>> {
     const request: UpdateChatSessionDto = { sessionName };
     return apiClient.put<ChatSessionDto>(`/history/sessions/${sessionId}`, request);
   },
@@ -165,8 +260,8 @@ export const historyService = {
     conversationId: string,
     updates: UpdateConversationRequest
   ): Promise<ApiResponse<{ conversation: Conversation }>> {
-    const sessionId = parseInt(conversationId);
-    if (isNaN(sessionId)) {
+    const sessionId = conversationId?.trim();
+    if (!sessionId) {
       return { success: false, error: 'Invalid session ID' };
     }
 
@@ -177,7 +272,7 @@ export const historyService = {
           success: true,
           data: {
             conversation: {
-              id: response.data.id.toString(),
+              id: response.data.sessionId,
               title: response.data.sessionName || '',
               timestamp: new Date(response.data.updatedAt),
               pinned: updates.pinned || false,
@@ -192,14 +287,14 @@ export const historyService = {
   },
 
   // Delete session - DELETE /api/history/sessions/{sessionId}
-  async deleteSession(sessionId: number): Promise<ApiResponse<void>> {
+  async deleteSession(sessionId: string): Promise<ApiResponse<void>> {
     return apiClient.delete<void>(`/history/sessions/${sessionId}`);
   },
 
   // Delete conversation (legacy wrapper)
   async deleteConversation(conversationId: string): Promise<ApiResponse<{ success: boolean }>> {
-    const sessionId = parseInt(conversationId);
-    if (isNaN(sessionId)) {
+    const sessionId = conversationId?.trim();
+    if (!sessionId) {
       return { success: false, error: 'Invalid session ID' };
     }
 
@@ -217,12 +312,12 @@ export const historyService = {
   },
 
   // Get messages in session - GET /api/history/sessions/{sessionId}/messages
-  async getSessionMessages(sessionId: number): Promise<ApiResponse<ChatHistoryDto[]>> {
+  async getSessionMessages(sessionId: string): Promise<ApiResponse<ChatHistoryDto[]>> {
     return apiClient.get<ChatHistoryDto[]>(`/history/sessions/${sessionId}/messages`);
   },
 
   // Create message - POST /api/history/messages
-  async createMessage(sessionId: number, question: string, answer: string): Promise<ApiResponse<ChatHistoryDto>> {
+  async createMessage(sessionId: string, question: string, answer: string): Promise<ApiResponse<ChatHistoryDto>> {
     const request: CreateChatHistoryDto = {
       sessionId,
       question,
@@ -232,12 +327,12 @@ export const historyService = {
   },
 
   // Update message - PUT /api/history/messages/{id}
-  async updateMessage(messageId: number, updates: UpdateChatHistoryDto): Promise<ApiResponse<ChatHistoryDto>> {
+  async updateMessage(messageId: string | number, updates: UpdateChatHistoryDto): Promise<ApiResponse<ChatHistoryDto>> {
     return apiClient.put<ChatHistoryDto>(`/history/messages/${messageId}`, updates);
   },
 
   // Delete message - DELETE /api/history/messages/{id}
-  async deleteMessage(messageId: number): Promise<ApiResponse<void>> {
+  async deleteMessage(messageId: string | number): Promise<ApiResponse<void>> {
     return apiClient.delete<void>(`/history/messages/${messageId}`);
   },
 
@@ -269,7 +364,6 @@ export const mockHistoryService = {
   // Mock data storage
   sessions: [
     {
-      id: 1,
       sessionId: 'session-1',
       sessionName: 'Tìm hiểu về Hồ Chí Minh',
       createdAt: '2025-01-15T10:30:00Z',
@@ -277,7 +371,6 @@ export const mockHistoryService = {
       messageCount: 5,
     },
     {
-      id: 2,
       sessionId: 'session-2',
       sessionName: 'Nguyễn Trãi và Bình Ngô đại cáo',
       createdAt: '2025-01-15T09:15:00Z',
@@ -285,7 +378,6 @@ export const mockHistoryService = {
       messageCount: 3,
     },
     {
-      id: 3,
       sessionId: 'session-3',
       sessionName: 'Trần Hưng Đạo đại chiến Bạch Đằng',
       createdAt: '2025-01-14T16:45:00Z',
@@ -293,7 +385,6 @@ export const mockHistoryService = {
       messageCount: 8,
     },
     {
-      id: 4,
       sessionId: 'session-4',
       sessionName: 'Lê Lợi khởi nghĩa Lam Sơn',
       createdAt: '2025-01-13T14:20:00Z',
@@ -301,7 +392,6 @@ export const mockHistoryService = {
       messageCount: 4,
     },
     {
-      id: 5,
       sessionId: 'session-5',
       sessionName: 'Hai Bà Trưng khởi nghĩa',
       createdAt: '2025-01-12T11:10:00Z',
@@ -337,7 +427,6 @@ export const mockHistoryService = {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     const newSession: ChatSessionDto = {
-      id: Date.now(),
       sessionId: `session-${Date.now()}`,
       sessionName: sessionName || 'Cuộc trò chuyện mới',
       createdAt: new Date().toISOString(),
@@ -363,7 +452,7 @@ export const mockHistoryService = {
         success: true,
         data: {
           conversation: {
-            id: response.data.id.toString(),
+            id: response.data.sessionId,
             title: response.data.sessionName,
             timestamp: new Date(response.data.createdAt),
             pinned: false,
@@ -374,16 +463,15 @@ export const mockHistoryService = {
     return { success: false, error: response.error };
   },
 
-  async getSession(sessionId: number): Promise<ApiResponse<ChatSessionDto>> {
+  async getSession(sessionId: string): Promise<ApiResponse<ChatSessionDto>> {
     await new Promise(resolve => setTimeout(resolve, 200));
-    const session = this.sessions.find(s => s.id === sessionId);
+    const session = this.sessions.find(s => s.sessionId === sessionId);
     if (!session) {
       return { success: false, error: 'Session not found' };
     }
     return {
       success: true,
       data: {
-        id: session.id,
         sessionId: session.sessionId,
         sessionName: session.sessionName,
         createdAt: session.createdAt,
@@ -392,10 +480,10 @@ export const mockHistoryService = {
     };
   },
 
-  async updateSession(sessionId: number, sessionName: string): Promise<ApiResponse<ChatSessionDto>> {
+  async updateSession(sessionId: string, sessionName: string): Promise<ApiResponse<ChatSessionDto>> {
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    const index = this.sessions.findIndex(s => s.id === sessionId);
+    const index = this.sessions.findIndex(s => s.sessionId === sessionId);
     if (index === -1) {
       return { success: false, error: 'Session not found' };
     }
@@ -405,7 +493,6 @@ export const mockHistoryService = {
     return {
       success: true,
       data: {
-        id: this.sessions[index].id,
         sessionId: this.sessions[index].sessionId,
         sessionName: this.sessions[index].sessionName,
         createdAt: this.sessions[index].createdAt,
@@ -415,7 +502,7 @@ export const mockHistoryService = {
   },
 
   async updateConversation(conversationId: string, updates: UpdateConversationRequest): Promise<ApiResponse<{ conversation: Conversation }>> {
-    const sessionId = parseInt(conversationId);
+    const sessionId = conversationId;
     if (updates.title) {
       const response = await this.updateSession(sessionId, updates.title);
       if (response.success && response.data) {
@@ -423,7 +510,7 @@ export const mockHistoryService = {
           success: true,
           data: {
             conversation: {
-              id: response.data.id.toString(),
+              id: response.data.sessionId,
               title: response.data.sessionName,
               timestamp: new Date(response.data.updatedAt),
               pinned: updates.pinned || false,
@@ -435,10 +522,10 @@ export const mockHistoryService = {
     return { success: true, data: { conversation: { id: conversationId, title: '', timestamp: new Date(), pinned: false } } };
   },
 
-  async deleteSession(sessionId: number): Promise<ApiResponse<void>> {
+  async deleteSession(sessionId: string): Promise<ApiResponse<void>> {
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    const index = this.sessions.findIndex(s => s.id === sessionId);
+    const index = this.sessions.findIndex(s => s.sessionId === sessionId);
     if (index === -1) {
       return { success: false, error: 'Session not found' };
     }
@@ -448,7 +535,7 @@ export const mockHistoryService = {
   },
 
   async deleteConversation(conversationId: string): Promise<ApiResponse<{ success: boolean }>> {
-    const sessionId = parseInt(conversationId);
+    const sessionId = conversationId;
     const response = await this.deleteSession(sessionId);
     return {
       success: response.success,
@@ -463,7 +550,7 @@ export const mockHistoryService = {
     return { success: true };
   },
 
-  async getSessionMessages(sessionId: number): Promise<ApiResponse<ChatHistoryDto[]>> {
+  async getSessionMessages(sessionId: string): Promise<ApiResponse<ChatHistoryDto[]>> {
     await new Promise(resolve => setTimeout(resolve, 300));
     const sessionMessages = this.messages.filter(m => m.sessionId === sessionId);
     return {
@@ -472,11 +559,11 @@ export const mockHistoryService = {
     };
   },
 
-  async createMessage(sessionId: number, question: string, answer: string): Promise<ApiResponse<ChatHistoryDto>> {
+  async createMessage(sessionId: string, question: string, answer: string): Promise<ApiResponse<ChatHistoryDto>> {
     await new Promise(resolve => setTimeout(resolve, 200));
 
     const newMessage: ChatHistoryDto = {
-      id: Date.now(),
+      id: `msg-${Date.now()}`,
       sessionId,
       question,
       answer,
@@ -486,7 +573,7 @@ export const mockHistoryService = {
     this.messages.push(newMessage);
 
     // Update session message count
-    const sessionIndex = this.sessions.findIndex(s => s.id === sessionId);
+    const sessionIndex = this.sessions.findIndex(s => s.sessionId === sessionId);
     if (sessionIndex !== -1) {
       this.sessions[sessionIndex].messageCount++;
       this.sessions[sessionIndex].lastMessageAt = newMessage.createdAt;
@@ -498,10 +585,10 @@ export const mockHistoryService = {
     };
   },
 
-  async updateMessage(messageId: number, updates: UpdateChatHistoryDto): Promise<ApiResponse<ChatHistoryDto>> {
+  async updateMessage(messageId: string | number, updates: UpdateChatHistoryDto): Promise<ApiResponse<ChatHistoryDto>> {
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    const index = this.messages.findIndex(m => m.id === messageId);
+    const index = this.messages.findIndex(m => m.id === String(messageId));
     if (index === -1) {
       return { success: false, error: 'Message not found' };
     }
@@ -517,10 +604,10 @@ export const mockHistoryService = {
     };
   },
 
-  async deleteMessage(messageId: number): Promise<ApiResponse<void>> {
+  async deleteMessage(messageId: string | number): Promise<ApiResponse<void>> {
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    const index = this.messages.findIndex(m => m.id === messageId);
+    const index = this.messages.findIndex(m => m.id === String(messageId));
     if (index === -1) {
       return { success: false, error: 'Message not found' };
     }

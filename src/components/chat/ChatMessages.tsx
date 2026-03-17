@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { SUGGESTION_CARDS } from "@/constants";
 import { Message } from "@/utils/chat";
 
@@ -20,6 +21,14 @@ export default function ChatMessages({
   const lastMessage = messages[messages.length - 1];
   const showRegenerateButton =
     hasMessages && lastMessage?.role === "assistant" && !isLoading;
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [messages, isLoading]);
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -136,6 +145,8 @@ export default function ChatMessages({
             </button>
           </div>
         )}
+
+        <div ref={messagesEndRef} />
       </div>
     </div>
   );

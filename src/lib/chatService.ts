@@ -8,6 +8,7 @@ import authService from './authService';
 // ChatRequest - POST /api/Question
 export interface ChatRequest {
   question: string;
+  SessionId?: string;
   documentIds?: string[];
   verbose?: boolean;
 }
@@ -16,6 +17,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   question: string;
   answer: string;
+  sessionId?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -101,11 +103,19 @@ export interface Message {
 // =====================
 export const chatService = {
   // Send question to AI - POST /api/Question
-  async sendQuestion(question: string, documentIds?: string[], verbose?: boolean): Promise<ApiResponse<ChatResponse>> {
+  async sendQuestion(
+    question: string,
+    options?: {
+      sessionId?: string;
+      documentIds?: string[];
+      verbose?: boolean;
+    }
+  ): Promise<ApiResponse<ChatResponse>> {
     const request: ChatRequest = {
       question,
-      documentIds,
-      verbose,
+      SessionId: options?.sessionId,
+      documentIds: options?.documentIds,
+      verbose: options?.verbose,
     };
     return apiClient.post<ChatResponse>('/Question', request);
   },
@@ -200,7 +210,14 @@ export const chatService = {
 // Mock Chat Service (for development)
 // =====================
 export const mockChatService = {
-  async sendQuestion(question: string, documentIds?: string[], verbose?: boolean): Promise<ApiResponse<ChatResponse>> {
+  async sendQuestion(
+    question: string,
+    options?: {
+      sessionId?: string;
+      documentIds?: string[];
+      verbose?: boolean;
+    }
+  ): Promise<ApiResponse<ChatResponse>> {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -209,7 +226,8 @@ export const mockChatService = {
       data: {
         question,
         answer: `Đây là câu trả lời mẫu cho câu hỏi: "${question}". Trong môi trường production, câu trả lời sẽ được tạo bởi AI từ backend.`,
-        metadata: verbose ? { source: 'mock', timestamp: new Date().toISOString() } : undefined,
+        sessionId: options?.sessionId || `session-${Date.now()}`,
+        metadata: options?.verbose ? { source: 'mock', timestamp: new Date().toISOString() } : undefined,
       },
     };
   },

@@ -22,8 +22,12 @@ export default function ChatScreen() {
   const [user, setUser] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(true);
   const [currentChat, setCurrentChat] = useState<string | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
-  const sessionIdRef = useRef<number | null>(null); // Ref để lưu sessionId ngay lập tức
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const sessionIdRef = useRef<string | null>(null); // Session UUID for history service
+  const [currentQuestionSessionId, setCurrentQuestionSessionId] = useState<
+    string | null
+  >(null);
+  const questionSessionIdRef = useRef<string | null>(null); // Session ID string for Question API
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ChatModel>("RAG");
@@ -33,6 +37,11 @@ export default function ChatScreen() {
   const [isDesktopSidebarVisible, setIsDesktopSidebarVisible] = useState(true);
   const [prefillMessage, setPrefillMessage] = useState<string | null>(null);
   const [prefillNonce, setPrefillNonce] = useState(0);
+  const [optimisticConversation, setOptimisticConversation] = useState<{
+    id: string;
+    title: string;
+    timestamp: Date;
+  } | null>(null);
 
   // Detect subdomain and set model accordingly
   useEffect(() => {
@@ -83,7 +92,11 @@ export default function ChatScreen() {
   const handleSendMessage = async (message: string, model: ChatModel) => {
     if (!message.trim()) return;
 
-    console.log("📤 Sending message, sessionIdRef:", sessionIdRef.current);
+    console.log("📤 Sending message, historySessionId:", sessionIdRef.current);
+    console.log(
+      "📤 Sending message, questionSessionId:",
+      questionSessionIdRef.current,
+    );
 
     const userMessage = createMessage("user", message, model);
     const updatedMessages = [...messages, userMessage];
@@ -91,35 +104,33 @@ export default function ChatScreen() {
     setIsLoading(true);
 
     try {
-      // Sử dụng ref thay vì state để tránh vấn đề async
-      let sessionId = sessionIdRef.current;
+      // Use question sessionId only when continuing an existing flow.
+      let historySessionId = sessionIdRef.current;
+      let questionSessionId = questionSessionIdRef.current;
 
-      if (!isGuest && !sessionId) {
-        console.log("🆕 Creating new session for first message");
-        const sessionResponse = await historyService.createSession(
-          message.slice(0, 50) + (message.length > 50 ? "..." : ""),
-        );
-
-        if (sessionResponse.success && sessionResponse.data) {
-          sessionId = sessionResponse.data.id;
-          console.log("✅ Session created with ID:", sessionId);
-          // Update cả ref và state
-          sessionIdRef.current = sessionId;
-          setCurrentSessionId(sessionId);
-          setCurrentChat(sessionId.toString());
-          setSidebarRefreshTrigger((prev) => prev + 1);
-        } else {
-          // Nếu tạo session thất bại, không tiếp tục
-          console.error("❌ Failed to create session:", sessionResponse.error);
-          throw new Error("Không thể tạo phiên trò chuyện");
-        }
-      } else {
-        console.log("📝 Using existing session ID:", sessionId);
+      if (!isGuest && !historySessionId) {
+        const optimisticId = `temp-${Date.now()}`;
+        const optimisticTitle =
+          message.slice(0, 50) + (message.length > 50 ? "..." : "");
+        setOptimisticConversation({
+          id: optimisticId,
+          title: optimisticTitle,
+          timestamp: new Date(),
+        });
+        setCurrentChat(optimisticId);
       }
 
-      const response = await chatService.sendQuestion(message);
+      const response = await chatService.sendQuestion(message, {
+        sessionId: questionSessionId || undefined,
+      });
 
       if (response.success && response.data) {
+        if (response.data.sessionId) {
+          questionSessionId = response.data.sessionId;
+          questionSessionIdRef.current = response.data.sessionId;
+          setCurrentQuestionSessionId(response.data.sessionId);
+        }
+
         const aiMessage = createMessage(
           "assistant",
           response.data.answer,
@@ -128,9 +139,62 @@ export default function ChatScreen() {
         const finalMessages = [...updatedMessages, aiMessage];
         setMessages(finalMessages);
 
-        if (!isGuest && sessionId) {
+        // Refresh history list immediately after backend returns an answer.
+        if (!isGuest) {
+          setSidebarRefreshTrigger((prev) => prev + 1);
+        }
+
+        if (!isGuest && !historySessionId) {
+          const fallbackTitle =
+            message.slice(0, 50) + (message.length > 50 ? "..." : "");
+
+          const sessionResponse = await historyService.createSession(
+            fallbackTitle,
+            questionSessionId || undefined,
+          );
+
+          if (sessionResponse.success && sessionResponse.data) {
+            historySessionId = sessionResponse.data.sessionId;
+            sessionIdRef.current = historySessionId;
+            setCurrentSessionId(historySessionId);
+            setCurrentChat(historySessionId);
+            // Keep optimistic row with the real sessionId so sidebar does not
+            // flicker empty when list API is eventually consistent.
+            setOptimisticConversation({
+              id: historySessionId,
+              title: sessionResponse.data.sessionName || fallbackTitle,
+              timestamp: new Date(),
+            });
+            setSidebarRefreshTrigger((prev) => prev + 1);
+
+            if (!questionSessionId && sessionResponse.data.sessionId) {
+              questionSessionId = sessionResponse.data.sessionId;
+              questionSessionIdRef.current = sessionResponse.data.sessionId;
+              setCurrentQuestionSessionId(sessionResponse.data.sessionId);
+            }
+          } else if (questionSessionId) {
+            // Fallback: Question API may have already created the session.
+            const existingSession =
+              await historyService.getSession(questionSessionId);
+
+            if (existingSession.success && existingSession.data) {
+              historySessionId = existingSession.data.sessionId;
+              sessionIdRef.current = historySessionId;
+              setCurrentSessionId(historySessionId);
+              setCurrentChat(historySessionId);
+              setOptimisticConversation({
+                id: historySessionId,
+                title: existingSession.data.sessionName || fallbackTitle,
+                timestamp: new Date(),
+              });
+              setSidebarRefreshTrigger((prev) => prev + 1);
+            }
+          }
+        }
+
+        if (!isGuest && historySessionId) {
           const saveResult = await historyService.createMessage(
-            sessionId,
+            historySessionId,
             message,
             response.data.answer,
           );
@@ -147,15 +211,21 @@ export default function ChatScreen() {
         );
         setMessages([...updatedMessages, errorMessage]);
 
-        if (!isGuest && sessionId) {
+        if (!isGuest && !historySessionId) {
+          setOptimisticConversation(null);
+          setCurrentChat(null);
+        }
+
+        if (!isGuest && historySessionId) {
           await historyService.createMessage(
-            sessionId,
+            historySessionId,
             message,
             `[Error] ${errorText}`,
           );
         }
       }
     } catch (error) {
+      setOptimisticConversation(null);
       const errorMessage = createMessage(
         "assistant",
         "Xin lỗi, đã có lỗi xảy ra khi xử lý câu hỏi của bạn. Vui lòng thử lại sau.",
@@ -171,7 +241,10 @@ export default function ChatScreen() {
     setMessages([]);
     setCurrentChat(null);
     setCurrentSessionId(null);
+    setCurrentQuestionSessionId(null);
+    setOptimisticConversation(null);
     sessionIdRef.current = null; // Reset ref
+    questionSessionIdRef.current = null;
 
     if (isGuest) {
       clearMessagesFromStorage();
@@ -181,15 +254,17 @@ export default function ChatScreen() {
   const handleSelectChat = async (sessionId: string) => {
     try {
       setIsLoading(true);
-      const numericSessionId = parseInt(sessionId);
-      const response =
-        await historyService.getSessionMessages(numericSessionId);
+      setOptimisticConversation(null);
+      const [messagesResponse, sessionResponse] = await Promise.all([
+        historyService.getSessionMessages(sessionId),
+        historyService.getSession(sessionId),
+      ]);
 
-      if (response.success && response.data) {
+      if (messagesResponse.success && messagesResponse.data) {
         // Convert history messages to Message format
         const loadedMessages: Message[] = [];
 
-        response.data.forEach((historyItem) => {
+        messagesResponse.data.forEach((historyItem) => {
           // Add user message
           if (historyItem.question) {
             loadedMessages.push(
@@ -206,8 +281,16 @@ export default function ChatScreen() {
 
         setMessages(loadedMessages);
         setCurrentChat(sessionId);
-        setCurrentSessionId(numericSessionId);
-        sessionIdRef.current = numericSessionId; // Update ref
+        setCurrentSessionId(sessionId);
+        sessionIdRef.current = sessionId; // Update ref
+
+        const selectedQuestionSessionId =
+          sessionResponse.success && sessionResponse.data?.sessionId
+            ? sessionResponse.data.sessionId
+            : null;
+
+        setCurrentQuestionSessionId(selectedQuestionSessionId);
+        questionSessionIdRef.current = selectedQuestionSessionId;
       }
     } catch (error) {
       // Error loading messages
@@ -300,6 +383,7 @@ export default function ChatScreen() {
               }}
               currentChat={currentChat}
               refreshTrigger={sidebarRefreshTrigger}
+              optimisticConversation={optimisticConversation}
               collapsed={isSidebarCollapsed}
               onToggleSidebar={toggleDesktopSidebar}
             />
