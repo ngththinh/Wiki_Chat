@@ -16,6 +16,11 @@ interface ChatSidebarNavProps {
   refreshTrigger?: number;
   collapsed?: boolean;
   onToggleSidebar?: () => void;
+  optimisticConversation?: {
+    id: string;
+    title: string;
+    timestamp: Date;
+  } | null;
 }
 
 interface Conversation {
@@ -34,6 +39,7 @@ export default function ChatSidebarNav({
   refreshTrigger = 0,
   collapsed = false,
   onToggleSidebar,
+  optimisticConversation = null,
 }: ChatSidebarNavProps) {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -131,7 +137,20 @@ export default function ChatSidebarNav({
     }),
   );
 
-  const conversations = [...allConversationsData].sort((a, b) => {
+  const mergedConversations = [...allConversationsData];
+  if (
+    optimisticConversation &&
+    !mergedConversations.some((conv) => conv.id === optimisticConversation.id)
+  ) {
+    mergedConversations.unshift({
+      id: optimisticConversation.id,
+      title: optimisticConversation.title,
+      timestamp: optimisticConversation.timestamp,
+      pinned: false,
+    });
+  }
+
+  const conversations = [...mergedConversations].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
     return b.timestamp.getTime() - a.timestamp.getTime();
@@ -515,7 +534,10 @@ export default function ChatSidebarNav({
                 {conversations.map((conv) => (
                   <div key={conv.id} className="relative group">
                     <button
-                      onClick={() => onSelectChat?.(conv.id)}
+                      onClick={() => {
+                        if (conv.id.startsWith("temp-")) return;
+                        onSelectChat?.(conv.id);
+                      }}
                       className={`w-full text-left px-3 py-2.5 text-sm transition-all rounded-lg ${
                         currentChat === conv.id
                           ? "bg-slate-100 text-slate-800 border border-slate-200"

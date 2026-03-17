@@ -62,6 +62,8 @@ export type ChatModel = "RAG" | "GraphRAG";
 
 export interface ChatRequest {
   question: string;
+  SessionId?: string;
+  sessionId?: string;
   documentIds?: string[];
   verbose?: boolean;
 }
@@ -69,6 +71,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   question: string;
   answer: string;
+  sessionId?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -86,7 +89,6 @@ export interface Message {
 // Session/Conversation Types (matching backend)
 // =====================
 export interface ChatSessionDto {
-  id: number;
   sessionId: string;
   sessionName: string;
   createdAt: string;
@@ -94,7 +96,6 @@ export interface ChatSessionDto {
 }
 
 export interface SessionSummaryDto {
-  id: number;
   sessionId: string;
   sessionName: string;
   createdAt: string;
@@ -103,8 +104,8 @@ export interface SessionSummaryDto {
 }
 
 export interface ChatHistoryDto {
-  id: number;
-  sessionId: number;
+  id: string;
+  sessionId: string;
   question: string;
   answer: string;
   createdAt: string;
