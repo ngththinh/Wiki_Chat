@@ -22,11 +22,7 @@ export default function ChatScreen() {
   const [user, setUser] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(true);
   const [currentChat, setCurrentChat] = useState<string | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null); // Session UUID for history service
-  const [currentQuestionSessionId, setCurrentQuestionSessionId] = useState<
-    string | null
-  >(null);
   const questionSessionIdRef = useRef<string | null>(null); // Session ID string for Question API
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,11 +33,7 @@ export default function ChatScreen() {
   const [isDesktopSidebarVisible, setIsDesktopSidebarVisible] = useState(true);
   const [prefillMessage, setPrefillMessage] = useState<string | null>(null);
   const [prefillNonce, setPrefillNonce] = useState(0);
-  const [optimisticConversation, setOptimisticConversation] = useState<{
-    id: string;
-    title: string;
-    timestamp: Date;
-  } | null>(null);
+  const [isPendingConversation, setIsPendingConversation] = useState(false);
 
   // Detect subdomain and set model accordingly
   useEffect(() => {
@@ -109,15 +101,7 @@ export default function ChatScreen() {
       let questionSessionId = questionSessionIdRef.current;
 
       if (!isGuest && !historySessionId) {
-        const optimisticId = `temp-${Date.now()}`;
-        const optimisticTitle =
-          message.slice(0, 50) + (message.length > 50 ? "..." : "");
-        setOptimisticConversation({
-          id: optimisticId,
-          title: optimisticTitle,
-          timestamp: new Date(),
-        });
-        setCurrentChat(optimisticId);
+        setIsPendingConversation(true);
       }
 
       const response = await chatService.sendQuestion(message, {
@@ -128,7 +112,6 @@ export default function ChatScreen() {
         if (response.data.sessionId) {
           questionSessionId = response.data.sessionId;
           questionSessionIdRef.current = response.data.sessionId;
-          setCurrentQuestionSessionId(response.data.sessionId);
         }
 
         const aiMessage = createMessage(
@@ -156,21 +139,13 @@ export default function ChatScreen() {
           if (sessionResponse.success && sessionResponse.data) {
             historySessionId = sessionResponse.data.sessionId;
             sessionIdRef.current = historySessionId;
-            setCurrentSessionId(historySessionId);
             setCurrentChat(historySessionId);
-            // Keep optimistic row with the real sessionId so sidebar does not
-            // flicker empty when list API is eventually consistent.
-            setOptimisticConversation({
-              id: historySessionId,
-              title: sessionResponse.data.sessionName || fallbackTitle,
-              timestamp: new Date(),
-            });
+            setIsPendingConversation(false);
             setSidebarRefreshTrigger((prev) => prev + 1);
 
             if (!questionSessionId && sessionResponse.data.sessionId) {
               questionSessionId = sessionResponse.data.sessionId;
               questionSessionIdRef.current = sessionResponse.data.sessionId;
-              setCurrentQuestionSessionId(sessionResponse.data.sessionId);
             }
           } else if (questionSessionId) {
             // Fallback: Question API may have already created the session.
@@ -180,13 +155,8 @@ export default function ChatScreen() {
             if (existingSession.success && existingSession.data) {
               historySessionId = existingSession.data.sessionId;
               sessionIdRef.current = historySessionId;
-              setCurrentSessionId(historySessionId);
               setCurrentChat(historySessionId);
-              setOptimisticConversation({
-                id: historySessionId,
-                title: existingSession.data.sessionName || fallbackTitle,
-                timestamp: new Date(),
-              });
+              setIsPendingConversation(false);
               setSidebarRefreshTrigger((prev) => prev + 1);
             }
           }
@@ -212,7 +182,7 @@ export default function ChatScreen() {
         setMessages([...updatedMessages, errorMessage]);
 
         if (!isGuest && !historySessionId) {
-          setOptimisticConversation(null);
+          setIsPendingConversation(false);
           setCurrentChat(null);
         }
 
@@ -225,7 +195,7 @@ export default function ChatScreen() {
         }
       }
     } catch (error) {
-      setOptimisticConversation(null);
+      setIsPendingConversation(false);
       const errorMessage = createMessage(
         "assistant",
         "Xin lỗi, đã có lỗi xảy ra khi xử lý câu hỏi của bạn. Vui lòng thử lại sau.",
@@ -240,9 +210,7 @@ export default function ChatScreen() {
   const handleNewChat = async () => {
     setMessages([]);
     setCurrentChat(null);
-    setCurrentSessionId(null);
-    setCurrentQuestionSessionId(null);
-    setOptimisticConversation(null);
+    setIsPendingConversation(false);
     sessionIdRef.current = null; // Reset ref
     questionSessionIdRef.current = null;
 
@@ -254,7 +222,7 @@ export default function ChatScreen() {
   const handleSelectChat = async (sessionId: string) => {
     try {
       setIsLoading(true);
-      setOptimisticConversation(null);
+      setIsPendingConversation(false);
       const [messagesResponse, sessionResponse] = await Promise.all([
         historyService.getSessionMessages(sessionId),
         historyService.getSession(sessionId),
@@ -281,7 +249,6 @@ export default function ChatScreen() {
 
         setMessages(loadedMessages);
         setCurrentChat(sessionId);
-        setCurrentSessionId(sessionId);
         sessionIdRef.current = sessionId; // Update ref
 
         const selectedQuestionSessionId =
@@ -289,7 +256,6 @@ export default function ChatScreen() {
             ? sessionResponse.data.sessionId
             : null;
 
-        setCurrentQuestionSessionId(selectedQuestionSessionId);
         questionSessionIdRef.current = selectedQuestionSessionId;
       }
     } catch (error) {
@@ -383,7 +349,7 @@ export default function ChatScreen() {
               }}
               currentChat={currentChat}
               refreshTrigger={sidebarRefreshTrigger}
-              optimisticConversation={optimisticConversation}
+              isPendingConversation={isPendingConversation}
               collapsed={isSidebarCollapsed}
               onToggleSidebar={toggleDesktopSidebar}
             />
