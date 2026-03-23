@@ -65,6 +65,54 @@ export interface DailyStatsDto {
   newMessages: number;
 }
 
+export interface CategoryDto {
+  id: string;
+  name: string | null;
+  description: string | null;
+  detailCount: number;
+  createdAt: string;
+}
+
+export interface CategoryListDto {
+  id: string;
+  name: string | null;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface DetailDto {
+  id: string;
+  title: string | null;
+  content: string | null;
+  wikipediaUrl: string | null;
+  categoryId: string;
+  categoryName: string | null;
+  createdAt: string;
+}
+
+export interface CreateCategoryDto {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateCategoryDto {
+  name?: string;
+  description?: string;
+}
+
+export interface CreateDetailDto {
+  categoryId: string;
+  title: string;
+  content: string;
+  wikipediaUrl?: string;
+}
+
+export interface UpdateDetailDto {
+  title?: string;
+  content?: string;
+  wikipediaUrl?: string;
+}
+
 export interface DocumentInfo {
   id: string;
   file_path: string | null;
@@ -405,6 +453,252 @@ export const adminService = {
       if (!response.ok) {
         const data = await safeJsonParse(response);
         return { success: false, error: data?.message || data?.detail || 'Lỗi xóa phiên chat' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // ==================== CATEGORIES (PUBLIC) ====================
+
+  // Get public categories
+  async getCategories(): Promise<ApiResponse<CategoryDto[]>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/Category`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh mục (HTTP ${response.status})` };
+      }
+
+      const data = await safeJsonParse(response);
+      return { success: true, data: Array.isArray(data) ? data : [] };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Get public landing categories
+  async getLandingCategories(limit: number = 10): Promise<ApiResponse<CategoryListDto[]>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/Category/landing?limit=${limit}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh mục landing (HTTP ${response.status})` };
+      }
+
+      const data = await safeJsonParse(response);
+      return { success: true, data: Array.isArray(data) ? data : [] };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Get detail by id
+  async getDetail(detailId: string): Promise<ApiResponse<DetailDto>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/Detail/${detailId}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi lấy chi tiết danh nhân (HTTP ${response.status})` };
+      }
+
+      const data = await safeJsonParse(response);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Get details by category id
+  async getDetailsByCategory(categoryId: string): Promise<ApiResponse<DetailDto[]>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/Detail/category/${categoryId}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh sách danh nhân (HTTP ${response.status})` };
+      }
+
+      const data = await safeJsonParse(response);
+      return { success: true, data: Array.isArray(data) ? data : [] };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // ==================== ADMIN CATEGORIES ====================
+
+  // Get admin categories
+  async getAdminCategories(): Promise<ApiResponse<CategoryDto[]>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/categories`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh mục admin (HTTP ${response.status})` };
+      }
+
+      const data = await safeJsonParse(response);
+      return { success: true, data: Array.isArray(data) ? data : [] };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Create admin category
+  async createAdminCategory(payload: CreateCategoryDto): Promise<ApiResponse<string>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/categories`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi tạo danh mục (HTTP ${response.status})` };
+      }
+
+      const data = await safeJsonParse(response);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Update admin category
+  async updateAdminCategory(categoryId: string, payload: UpdateCategoryDto): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/categories/${categoryId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi cập nhật danh mục (HTTP ${response.status})` };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Delete admin category
+  async deleteAdminCategory(categoryId: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/categories/${categoryId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi xóa danh mục (HTTP ${response.status})` };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // ==================== ADMIN DETAILS ====================
+
+  // Get admin details
+  async getAdminDetails(): Promise<ApiResponse<DetailDto[]>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/details`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh nhân admin (HTTP ${response.status})` };
+      }
+
+      const data = await safeJsonParse(response);
+      return { success: true, data: Array.isArray(data) ? data : [] };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Create admin detail
+  async createAdminDetail(payload: CreateDetailDto): Promise<ApiResponse<string>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/details`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi tạo danh nhân (HTTP ${response.status})` };
+      }
+
+      const data = await safeJsonParse(response);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Update admin detail
+  async updateAdminDetail(detailId: string, payload: UpdateDetailDto): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/details/${detailId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi cập nhật danh nhân (HTTP ${response.status})` };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Delete admin detail
+  async deleteAdminDetail(detailId: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/details/${detailId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return { success: false, error: data?.message || data?.detail || `Lỗi xóa danh nhân (HTTP ${response.status})` };
       }
 
       return { success: true };
