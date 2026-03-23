@@ -13,13 +13,14 @@ import {
   DocumentsTab,
 } from "@/components/admin";
 
-type TabType = "dashboard" | "users" | "sessions" | "documents";
+type TabType = "dashboard" | "users" | "sessions" | "categories" | "details";
 
 const tabLabels: Record<TabType, string> = {
   dashboard: "Tổng quan",
   users: "Người dùng",
   sessions: "Phiên chat",
-  documents: "Danh mục & Danh nhân",
+  categories: "Quản lý danh mục",
+  details: "Quản lý danh nhân",
 };
 
 export default function AdminDashboard() {
@@ -210,7 +211,8 @@ export default function AdminDashboard() {
             )}
             {activeTab === "users" && <UsersTab />}
             {activeTab === "sessions" && <SessionsTab />}
-            {activeTab === "documents" && <DocumentsTab />}
+            {activeTab === "categories" && <DocumentsTab mode="categories" />}
+            {activeTab === "details" && <DocumentsTab mode="details" />}
           </div>
         </div>
       </div>
