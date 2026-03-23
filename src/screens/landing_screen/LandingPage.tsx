@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import authService from "@/lib/authService";
+import adminService, { CategoryListDto, DetailDto } from "@/lib/adminService";
 
 // ==================== DATA ====================
-const CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   {
     id: 1,
     category: "Lịch sử",
@@ -535,13 +536,38 @@ function IntroSection() {
 
 // ==================== CATEGORY BLOCK ====================
 interface CategoryItem {
-  id: number;
+  id: string;
   category: string;
   representative: string;
   years: string;
   description: string;
   tagline: string;
 }
+
+const trimText = (value: string, maxLength: number) => {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength).trim()}...`;
+};
+
+const buildCategoryItem = (
+  category: CategoryListDto,
+  details: DetailDto[],
+): CategoryItem => {
+  const topDetail = details[0];
+  const rawContent = (topDetail?.content || category.description || "").trim();
+  const safeContent = rawContent || "Dữ liệu danh nhân đang được cập nhật.";
+
+  return {
+    id: category.id,
+    category: category.name || "Danh mục",
+    representative: topDetail?.title || category.name || "Danh nhân tiêu biểu",
+    years: topDetail?.createdAt
+      ? `Cập nhật ${new Date(topDetail.createdAt).toLocaleDateString("vi-VN")}`
+      : "Dữ liệu đang cập nhật",
+    description: trimText(safeContent, 170),
+    tagline: trimText(safeContent, 80),
+  };
+};
 
 function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
   const isReversed = index % 2 === 1;
@@ -658,6 +684,44 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
 
 // ==================== CATEGORIES SECTION ====================
 function CategoriesSection() {
+  const [categoryItems, setCategoryItems] = useState<CategoryItem[]>(
+    FALLBACK_CATEGORIES.map((item) => ({ ...item, id: String(item.id) })),
+  );
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
+  useEffect(() => {
+    const loadCategoryContent = async () => {
+      setIsLoadingCategories(true);
+
+      const landingResponse = await adminService.getLandingCategories(10);
+      if (!landingResponse.success || !landingResponse.data) {
+        setIsLoadingCategories(false);
+        return;
+      }
+
+      if (landingResponse.data.length === 0) {
+        setCategoryItems([]);
+        setIsLoadingCategories(false);
+        return;
+      }
+
+      const detailResponses = await Promise.all(
+        landingResponse.data.map((category) =>
+          adminService.getDetailsByCategory(category.id),
+        ),
+      );
+
+      const mapped = landingResponse.data.map((category, index) =>
+        buildCategoryItem(category, detailResponses[index].data || []),
+      );
+
+      setCategoryItems(mapped);
+      setIsLoadingCategories(false);
+    };
+
+    loadCategoryContent();
+  }, []);
+
   return (
     <section
       id="categories"
@@ -726,11 +790,23 @@ function CategoriesSection() {
         </div>
 
         {/* Editorial Blocks */}
-        <div className="space-y-16 sm:space-y-28 lg:space-y-36">
-          {CATEGORIES.map((item, index) => (
-            <CategoryBlock key={item.id} item={item} index={index} />
-          ))}
-        </div>
+        {isLoadingCategories ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+          </div>
+        ) : categoryItems.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-sm text-slate-500 italic">
+              Chưa có dữ liệu danh mục. Vui lòng quay lại sau.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-16 sm:space-y-28 lg:space-y-36">
+            {categoryItems.map((item, index) => (
+              <CategoryBlock key={item.id} item={item} index={index} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

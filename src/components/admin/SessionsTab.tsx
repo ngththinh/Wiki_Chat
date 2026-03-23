@@ -126,9 +126,9 @@ export default function SessionsTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {sessions.map((s) => (
+                {sessions.map((s, index) => (
                   <tr
-                    key={s.id}
+                    key={`${s.id}-${s.sessionId || "no-session-id"}-${index}`}
                     className="hover:bg-slate-50/50 transition-colors"
                   >
                     <td className="px-5 py-3.5">

@@ -19,7 +19,7 @@ const tabLabels: Record<TabType, string> = {
   dashboard: "Tổng quan",
   users: "Người dùng",
   sessions: "Phiên chat",
-  documents: "Danh Nhân",
+  documents: "Danh mục & Danh nhân",
 };
 
 export default function AdminDashboard() {
