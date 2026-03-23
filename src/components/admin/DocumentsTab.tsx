@@ -11,7 +11,11 @@ import adminService, {
 } from "@/lib/adminService";
 import ConfirmModal from "@/components/common/ConfirmModal";
 
-export default function DocumentsTab() {
+interface DocumentsTabProps {
+  mode?: "all" | "categories" | "details";
+}
+
+export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [details, setDetails] = useState<DetailDto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,6 +64,9 @@ export default function DocumentsTab() {
     wikipediaUrl: "",
   });
 
+  const showCategoryManagement = mode !== "details";
+  const showDetailManagement = mode !== "categories";
+
   const filteredDetails = useMemo(() => {
     if (selectedCategoryId === "all") return details;
     return details.filter((detail) => detail.categoryId === selectedCategoryId);
@@ -76,11 +83,12 @@ export default function DocumentsTab() {
     ]);
 
     if (categoriesRes.success && categoriesRes.data) {
-      setCategories(categoriesRes.data);
-      if (categoriesRes.data.length > 0) {
+      const categoryData = categoriesRes.data;
+      setCategories(categoryData);
+      if (categoryData.length > 0) {
         setNewDetail((prev) => {
           if (prev.categoryId) return prev;
-          return { ...prev, categoryId: categoriesRes.data[0].id };
+          return { ...prev, categoryId: categoryData[0].id };
         });
       }
     } else if (categoriesRes.error) {
@@ -134,12 +142,8 @@ export default function DocumentsTab() {
   };
 
   const handleCreateDetail = async () => {
-    if (
-      !newDetail.categoryId ||
-      !newDetail.title.trim() ||
-      !newDetail.content.trim()
-    ) {
-      showError("Vui lòng nhập đủ danh mục, tiêu đề và nội dung.");
+    if (!newDetail.categoryId || !newDetail.title.trim()) {
+      showError("Vui lòng nhập đủ danh mục và tiêu đề.");
       clearMessageSoon();
       return;
     }
@@ -148,7 +152,8 @@ export default function DocumentsTab() {
     const response = await adminService.createAdminDetail({
       categoryId: newDetail.categoryId,
       title: newDetail.title.trim(),
-      content: newDetail.content.trim(),
+      // Backend currently requires content; fallback to title when create form hides content input.
+      content: newDetail.content.trim() || newDetail.title.trim(),
       wikipediaUrl: newDetail.wikipediaUrl?.trim() || undefined,
     });
 
@@ -291,328 +296,340 @@ export default function DocumentsTab() {
         </div>
       )}
 
-      {/* Category create */}
-      <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-5 h-px bg-slate-300" />
-          <h3 className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
-            Tạo danh mục
-          </h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input
-            type="text"
-            value={newCategory.name}
-            onChange={(e) =>
-              setNewCategory((prev) => ({ ...prev, name: e.target.value }))
-            }
-            placeholder="Tên danh mục"
-            className="md:col-span-1 px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-          />
-          <input
-            type="text"
-            value={newCategory.description || ""}
-            onChange={(e) =>
-              setNewCategory((prev) => ({
-                ...prev,
-                description: e.target.value,
-              }))
-            }
-            placeholder="Mô tả ngắn"
-            className="md:col-span-1 px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-          />
-          <button
-            onClick={handleCreateCategory}
-            disabled={submitting}
-            className="md:col-span-1 px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors text-sm font-medium"
-          >
-            Thêm danh mục
-          </button>
-        </div>
-      </div>
-
-      {/* Detail create */}
-      <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-5 h-px bg-slate-300" />
-          <h3 className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
-            Tạo danh nhân (Detail)
-          </h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <select
-            value={newDetail.categoryId}
-            onChange={(e) =>
-              setNewDetail((prev) => ({ ...prev, categoryId: e.target.value }))
-            }
-            className="px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-          >
-            <option value="">Chọn danh mục</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            value={newDetail.title}
-            onChange={(e) =>
-              setNewDetail((prev) => ({ ...prev, title: e.target.value }))
-            }
-            placeholder="Tiêu đề danh nhân"
-            className="px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-          />
-          <input
-            type="text"
-            value={newDetail.wikipediaUrl || ""}
-            onChange={(e) =>
-              setNewDetail((prev) => ({
-                ...prev,
-                wikipediaUrl: e.target.value,
-              }))
-            }
-            placeholder="Wikipedia URL (tùy chọn)"
-            className="md:col-span-2 px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-          />
-          <textarea
-            value={newDetail.content}
-            onChange={(e) =>
-              setNewDetail((prev) => ({ ...prev, content: e.target.value }))
-            }
-            placeholder="Nội dung chi tiết"
-            rows={4}
-            className="md:col-span-2 px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm resize-y"
-          />
-          <button
-            onClick={handleCreateDetail}
-            disabled={submitting}
-            className="md:col-span-2 px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors text-sm font-medium"
-          >
-            Thêm danh nhân
-          </button>
-        </div>
-      </div>
-
-      {/* Category list */}
-      <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-          <p className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
-            Danh sách danh mục
-          </p>
-          <span className="text-[11px] text-slate-400">
-            {categories.length} danh mục
-          </span>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-          </div>
-        ) : categories.length === 0 ? (
-          <p className="text-sm text-slate-400 italic text-center py-10">
-            Chưa có danh mục nào
-          </p>
-        ) : (
-          <div className="divide-y divide-slate-50">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="px-5 py-3.5 hover:bg-slate-50/60 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">
-                      {category.name}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {category.description || "Không có mô tả"}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
-                      <span>{category.detailCount} danh nhân</span>
-                      <span>
-                        {new Date(category.createdAt).toLocaleDateString(
-                          "vi-VN",
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEditCategory(category)}
-                      className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                      title="Chỉnh sửa danh mục"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleOpenDelete("category", category.id)}
-                      className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Xóa danh mục"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Detail list */}
-      <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
-            Danh sách danh nhân
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-400 hidden sm:inline">
-              Lọc theo danh mục
-            </span>
-            <select
-              value={selectedCategoryId}
-              onChange={(e) => setSelectedCategoryId(e.target.value)}
-              className="px-3 py-1.5 bg-white/80 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-xs text-slate-700"
-            >
-              <option value="all">Tất cả</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-          </div>
-        ) : filteredDetails.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-sm text-slate-400 italic">
-              Không có danh nhân phù hợp bộ lọc
+      {showCategoryManagement && (
+        <>
+          {/* Category create */}
+          <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-5 h-px bg-slate-300" />
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                Tạo danh mục
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Chức năng: thêm, sửa, xóa và theo dõi số lượng danh nhân trong
+              từng danh mục.
             </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-50">
-            {filteredDetails.map((detail) => (
-              <div
-                key={detail.id}
-                className="px-5 py-4 hover:bg-slate-50/50 transition-colors"
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input
+                type="text"
+                value={newCategory.name}
+                onChange={(e) =>
+                  setNewCategory((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="Tên danh mục"
+                className="md:col-span-1 px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+              />
+              <input
+                type="text"
+                value={newCategory.description || ""}
+                onChange={(e) =>
+                  setNewCategory((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                placeholder="Mô tả ngắn"
+                className="md:col-span-1 px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+              />
+              <button
+                onClick={handleCreateCategory}
+                disabled={submitting}
+                className="md:col-span-1 px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors text-sm font-medium"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                      <svg
-                        className="w-5 h-5 text-blue-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 6v6h4.5m6 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-700 truncate">
-                        {detail.title || "Chưa có tiêu đề"}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border bg-slate-50 text-slate-600 border-slate-200">
-                          {detail.categoryName || "Danh mục chưa xác định"}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(detail.createdAt).toLocaleDateString(
-                            "vi-VN",
-                          )}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-2 line-clamp-2">
-                        {detail.content || "Không có nội dung"}
-                      </p>
-                      {detail.wikipediaUrl && (
-                        <p className="text-[11px] text-blue-600 mt-1 truncate">
-                          {detail.wikipediaUrl}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => openEditDetail(detail)}
-                      className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                      title="Chỉnh sửa danh nhân"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleOpenDelete("detail", detail.id)}
-                      className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Xóa danh nhân"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                Thêm danh mục
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Category list */}
+          <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                Danh sách danh mục
+              </p>
+              <span className="text-[11px] text-slate-400">
+                {categories.length} danh mục
+              </span>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+              </div>
+            ) : categories.length === 0 ? (
+              <p className="text-sm text-slate-400 italic text-center py-10">
+                Chưa có danh mục nào
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {categories.map((category) => (
+                  <div
+                    key={category.id}
+                    className="px-5 py-3.5 hover:bg-slate-50/60 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">
+                          {category.name}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {category.description || "Không có mô tả"}
+                        </p>
+                        <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
+                          <span>{category.detailCount} danh nhân</span>
+                          <span>
+                            {new Date(category.createdAt).toLocaleDateString(
+                              "vi-VN",
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditCategory(category)}
+                          className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                          title="Chỉnh sửa danh mục"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleOpenDelete("category", category.id)
+                          }
+                          className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Xóa danh mục"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {showDetailManagement && (
+        <>
+          {/* Detail create */}
+          <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-5 h-px bg-slate-300" />
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                Cập nhật danh nhân
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Chức năng: thêm danh nhân theo danh mục, chỉnh sửa nội dung và xóa
+              bản ghi không còn sử dụng.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <select
+                value={newDetail.categoryId}
+                onChange={(e) =>
+                  setNewDetail((prev) => ({
+                    ...prev,
+                    categoryId: e.target.value,
+                  }))
+                }
+                className="px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+              >
+                <option value="">Chọn danh mục</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={newDetail.title}
+                onChange={(e) =>
+                  setNewDetail((prev) => ({ ...prev, title: e.target.value }))
+                }
+                placeholder="Tiêu đề danh nhân"
+                className="px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+              />
+              <input
+                type="text"
+                value={newDetail.wikipediaUrl || ""}
+                onChange={(e) =>
+                  setNewDetail((prev) => ({
+                    ...prev,
+                    wikipediaUrl: e.target.value,
+                  }))
+                }
+                placeholder="Wikipedia URL (tùy chọn)"
+                className="md:col-span-2 px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+              />
+              <button
+                onClick={handleCreateDetail}
+                disabled={submitting}
+                className="md:col-span-2 px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors text-sm font-medium"
+              >
+                Cập nhật
+              </button>
+            </div>
+          </div>
+
+          {/* Detail list */}
+          <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                Danh sách danh nhân
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400 hidden sm:inline">
+                  Lọc theo danh mục
+                </span>
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  className="px-3 py-1.5 bg-white/80 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-xs text-slate-700"
+                >
+                  <option value="all">Tất cả</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+              </div>
+            ) : filteredDetails.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-sm text-slate-400 italic">
+                  Không có danh nhân phù hợp bộ lọc
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {filteredDetails.map((detail) => (
+                  <div
+                    key={detail.id}
+                    className="px-5 py-4 hover:bg-slate-50/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                          <svg
+                            className="w-5 h-5 text-blue-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M12 6v6h4.5m6 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-700 truncate">
+                            {detail.title || "Chưa có tiêu đề"}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border bg-slate-50 text-slate-600 border-slate-200">
+                              {detail.categoryName || "Danh mục chưa xác định"}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {new Date(detail.createdAt).toLocaleDateString(
+                                "vi-VN",
+                              )}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-2 line-clamp-2">
+                            {detail.content || "Không có nội dung"}
+                          </p>
+                          {detail.wikipediaUrl && (
+                            <p className="text-[11px] text-blue-600 mt-1 truncate">
+                              {detail.wikipediaUrl}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => openEditDetail(detail)}
+                          className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                          title="Chỉnh sửa danh nhân"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleOpenDelete("detail", detail.id)}
+                          className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Xóa danh nhân"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Delete confirm */}
       <ConfirmModal
@@ -636,7 +653,7 @@ export default function DocumentsTab() {
       />
 
       {/* Edit category modal */}
-      {editCategoryModalOpen && editingCategory && (
+      {showCategoryManagement && editCategoryModalOpen && editingCategory && (
         <div className="fixed inset-0 z-9999 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
@@ -694,7 +711,7 @@ export default function DocumentsTab() {
       )}
 
       {/* Edit detail modal */}
-      {editDetailModalOpen && editingDetail && (
+      {showDetailManagement && editDetailModalOpen && editingDetail && (
         <div className="fixed inset-0 z-9999 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
