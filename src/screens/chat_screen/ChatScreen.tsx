@@ -15,6 +15,7 @@ import {
   getLastUserMessage,
 } from "@/utils/chat";
 import { ChatModel, detectModelFromSubdomain } from "@/utils/subdomain";
+import { MODELS } from "@/constants";
 
 const CHAT_SIDEBAR_VISIBILITY_KEY = "chatSidebarVisibleDesktop";
 
@@ -105,7 +106,9 @@ export default function ChatScreen() {
       }
 
       const response = await chatService.sendQuestion(message, {
-        sessionId: questionSessionId || undefined,
+        sessionId:
+          model === MODELS.RAG ? questionSessionId || undefined : undefined,
+        model,
       });
 
       if (response.success && response.data) {

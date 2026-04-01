@@ -85,7 +85,7 @@ export interface DetailDto {
   title: string | null;
   content: string | null;
   wikipediaUrl: string | null;
-  categoryId: string;
+  categoryId: string | null;
   categoryName: string | null;
   createdAt: string;
 }
@@ -174,6 +174,10 @@ const getAuthHeaders = () => {
 
   return headers;
 };
+
+const getPublicHeaders = (): Record<string, string> => ({
+  'Accept': 'application/json',
+});
 
 // Helper to safely parse JSON from response (handles empty/non-JSON bodies)
 const safeJsonParse = async (response: Response) => {
@@ -468,7 +472,7 @@ export const adminService = {
     try {
       const response = await fetch(`${API_BASE_URL}/Category`, {
         method: 'GET',
-        headers: getAuthHeaders(),
+        headers: getPublicHeaders(),
       });
 
       if (!response.ok) {
@@ -488,7 +492,7 @@ export const adminService = {
     try {
       const response = await fetch(`${API_BASE_URL}/Category/landing?limit=${limit}`, {
         method: 'GET',
-        headers: getAuthHeaders(),
+        headers: getPublicHeaders(),
       });
 
       if (!response.ok) {
@@ -508,7 +512,7 @@ export const adminService = {
     try {
       const response = await fetch(`${API_BASE_URL}/Detail/${detailId}`, {
         method: 'GET',
-        headers: getAuthHeaders(),
+        headers: getPublicHeaders(),
       });
 
       if (!response.ok) {
@@ -528,7 +532,7 @@ export const adminService = {
     try {
       const response = await fetch(`${API_BASE_URL}/Detail/category/${categoryId}`, {
         method: 'GET',
-        headers: getAuthHeaders(),
+        headers: getPublicHeaders(),
       });
 
       if (!response.ok) {

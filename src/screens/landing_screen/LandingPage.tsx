@@ -64,6 +64,27 @@ const FALLBACK_CATEGORIES = [
   },
 ];
 
+const scrollToCategories = () => {
+  if (typeof window === "undefined") return;
+
+  const categoriesSection = document.getElementById("categories");
+  if (!categoriesSection) {
+    window.location.assign("/#categories");
+    return;
+  }
+
+  const headerOffset = 96;
+  const targetTop =
+    categoriesSection.getBoundingClientRect().top +
+    window.scrollY -
+    headerOffset;
+
+  window.scrollTo({
+    top: Math.max(targetTop, 0),
+    behavior: "smooth",
+  });
+};
+
 // ==================== HEADER ====================
 function Header() {
   const router = useRouter();
@@ -365,8 +386,9 @@ function HeroSection() {
             </span>
           </Link>
 
-          <Link
-            href="#categories"
+          <button
+            type="button"
+            onClick={scrollToCategories}
             className="group flex items-center gap-3 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors duration-300"
           >
             <span>Khám phá danh mục</span>
@@ -383,7 +405,7 @@ function HeroSection() {
                 d="M19 14l-7 7m0 0l-7-7m7 7V3"
               />
             </svg>
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -576,6 +598,10 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
     return `/chat?context=${encodeURIComponent(item.category)}&prompt=${encodeURIComponent(`Hãy cho tôi biết về ${item.representative}`)}`;
   };
 
+  const getViewAllPeopleUrl = () => {
+    return `/categories?categoryId=${encodeURIComponent(item.id)}&name=${encodeURIComponent(item.category)}`;
+  };
+
   return (
     <div
       className={`flex flex-col ${isReversed ? "lg:flex-row-reverse" : "lg:flex-row"} items-center gap-12 lg:gap-20`}
@@ -655,28 +681,54 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
         {/* Tagline */}
         <p className="text-base text-slate-400 mb-10">{item.tagline}</p>
 
-        {/* CTA Button - Minimal style */}
-        <Link
-          href={getChatUrl()}
-          className={`inline-flex items-center gap-3 text-sm font-medium text-slate-900 hover:text-slate-600 transition-colors duration-300 group/btn ${isReversed ? "lg:ml-auto" : ""}`}
+        <div
+          className={`flex flex-col items-center gap-3 ${isReversed ? "lg:items-end" : "lg:items-start"}`}
         >
-          <span className="border-b border-slate-900 group-hover/btn:border-slate-600 pb-1">
-            Trò chuyện với AI
-          </span>
-          <svg
-            className="w-4 h-4 transform group-hover/btn:translate-x-1 transition-transform"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          {/* CTA Button - Minimal style */}
+          <Link
+            href={getChatUrl()}
+            className="inline-flex items-center gap-3 text-sm font-medium text-slate-900 hover:text-slate-600 transition-colors duration-300 group/btn whitespace-nowrap"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M17 8l4 4m0 0l-4 4m4-4H3"
-            />
-          </svg>
-        </Link>
+            <span className="border-b border-slate-900 group-hover/btn:border-slate-600 pb-1">
+              Trò chuyện với AI
+            </span>
+            <svg
+              className="w-4 h-4 transform group-hover/btn:translate-x-1 transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M17 8l4 4m0 0l-4 4m4-4H3"
+              />
+            </svg>
+          </Link>
+
+          <Link
+            href={getViewAllPeopleUrl()}
+            className="inline-flex items-center gap-3 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors duration-300 group/all whitespace-nowrap"
+          >
+            <span className="border-b border-slate-300 group-hover/all:border-slate-500 pb-1">
+              Xem tất cả danh nhân
+            </span>
+            <svg
+              className="w-4 h-4 transform group-hover/all:translate-x-1 transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M17 8l4 4m0 0l-4 4m4-4H3"
+              />
+            </svg>
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -924,8 +976,9 @@ function CTASection({ isAuthenticated }: { isAuthenticated: boolean }) {
                 </span>
               </Link>
 
-              <Link
-                href="#categories"
+              <button
+                type="button"
+                onClick={scrollToCategories}
                 className="group flex items-center gap-3 text-sm font-medium text-white/60 hover:text-white transition-colors duration-300"
               >
                 <span>Xem lại danh mục</span>
@@ -942,7 +995,7 @@ function CTASection({ isAuthenticated }: { isAuthenticated: boolean }) {
                     d="M17 8l4 4m0 0l-4 4m4-4H3"
                   />
                 </svg>
-              </Link>
+              </button>
             </>
           ) : (
             <>
