@@ -46,6 +46,7 @@ export default function ChatSidebarNav({
     [],
   );
   const [isLoading, setIsLoading] = useState(true);
+  const hasLoadedConversationsRef = useRef(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -61,11 +62,14 @@ export default function ChatSidebarNav({
       if (isGuest) {
         setConversationsData([]);
         setIsLoading(false);
+        hasLoadedConversationsRef.current = true;
         return;
       }
 
       try {
-        setIsLoading(true);
+        if (!hasLoadedConversationsRef.current) {
+          setIsLoading(true);
+        }
         const response = await historyService.getConversations();
         if (response.success && response.data) {
           setConversationsData(response.data.conversations);
@@ -73,6 +77,7 @@ export default function ChatSidebarNav({
       } catch (error) {
         // Error fetching conversations
       } finally {
+        hasLoadedConversationsRef.current = true;
         setIsLoading(false);
       }
     };

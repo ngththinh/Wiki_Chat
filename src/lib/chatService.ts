@@ -1,5 +1,7 @@
 import { apiClient, ApiResponse } from './apiClient';
 import authService from './authService';
+import { ChatModel } from '@/utils/subdomain';
+import { MODELS } from '@/constants';
 
 // =====================
 // Backend API Types (matching Swagger)
@@ -19,6 +21,18 @@ export interface ChatResponse {
   answer: string;
   sessionId?: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface GraphRagChatRequest {
+  question: string;
+  sessionId?: string;
+}
+
+export interface GraphRagChatResponse {
+  success: boolean;
+  answer: string | null;
+  data?: unknown;
+  error?: string | null;
 }
 
 // SearchRequest - POST /api/Question/search
@@ -109,8 +123,13 @@ export const chatService = {
       sessionId?: string;
       documentIds?: string[];
       verbose?: boolean;
+      model?: ChatModel;
     }
   ): Promise<ApiResponse<ChatResponse>> {
+    if (options?.model === MODELS.GRAPH_RAG) {
+      return this.sendGraphRagQuestion(question, options?.sessionId);
+    }
+
     const request: ChatRequest = {
       question,
       SessionId: options?.sessionId,
@@ -118,6 +137,44 @@ export const chatService = {
       verbose: options?.verbose,
     };
     return apiClient.post<ChatResponse>('/Question', request);
+  },
+
+  async sendGraphRagQuestion(
+    question: string,
+    sessionId?: string,
+  ): Promise<ApiResponse<ChatResponse>> {
+    const request: GraphRagChatRequest = {
+      question,
+      sessionId,
+    };
+
+    const response = await apiClient.post<GraphRagChatResponse>(
+      '/graphrag/chat',
+      request,
+    );
+
+    if (!response.success || !response.data) {
+      return {
+        success: false,
+        error: response.error || 'Không thể kết nối đến GraphRAG',
+      };
+    }
+
+    if (!response.data.success) {
+      return {
+        success: false,
+        error: response.data.error || 'GraphRAG xử lý thất bại',
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        question,
+        answer: response.data.answer || 'Không tìm thấy thông tin trong dữ liệu.',
+        sessionId,
+      },
+    };
   },
 
   // Search in documents - POST /api/Question/search
@@ -216,6 +273,7 @@ export const mockChatService = {
       sessionId?: string;
       documentIds?: string[];
       verbose?: boolean;
+      model?: ChatModel;
     }
   ): Promise<ApiResponse<ChatResponse>> {
     // Simulate API delay
