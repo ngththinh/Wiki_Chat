@@ -343,7 +343,7 @@ function HeroSection() {
 
         {/* Main title - Serif editorial */}
         <h1 className="font-serif text-3xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-slate-900 mb-6 sm:mb-8 leading-[1.1] sm:leading-[1.05] tracking-tight">
-          Hỏi AI về
+          Khám phá
           <br />
           <span className="italic font-normal text-slate-600">
             Danh nhân Việt Nam
@@ -355,13 +355,34 @@ function HeroSection() {
 
         {/* Subtitle - Light editorial */}
         <p className="text-base sm:text-lg md:text-xl text-slate-500 mb-10 sm:mb-16 max-w-2xl mx-auto font-light leading-relaxed px-2">
-          Khám phá hành trình tri thức qua những cuộc đối thoại với AI.
+          Khám phá hơn 150 danh nhân Việt Nam
           <br className="hidden sm:block" />
-          Từ anh hùng dân tộc đến các nhà văn hóa kiệt xuất.
+          qua dữ liệu lịch sử và trí tuệ nhân tạo.
         </p>
 
         {/* CTA - Minimal editorial style */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-5 sm:gap-8">
+          <button
+            type="button"
+            onClick={scrollToCategories}
+            className="group flex items-center justify-center gap-3 px-8 sm:px-10 py-4 sm:py-5 border border-slate-300/80 bg-white/75 hover:bg-white rounded-xl w-full sm:w-auto text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors duration-300"
+          >
+            <span>Khám phá danh mục</span>
+            <svg
+              className="w-4 h-4 transform group-hover:translate-y-1 transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19 14l-7 7m0 0l-7-7m7 7V3"
+              />
+            </svg>
+          </button>
+
           <Link
             href="/chat"
             className="group relative px-8 sm:px-10 py-4 sm:py-5 bg-slate-900 text-white overflow-hidden rounded-xl w-full sm:w-auto text-center"
@@ -385,27 +406,6 @@ function HeroSection() {
               </svg>
             </span>
           </Link>
-
-          <button
-            type="button"
-            onClick={scrollToCategories}
-            className="group flex items-center gap-3 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors duration-300"
-          >
-            <span>Khám phá danh mục</span>
-            <svg
-              className="w-4 h-4 transform group-hover:translate-y-1 transition-transform"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M19 14l-7 7m0 0l-7-7m7 7V3"
-              />
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -503,19 +503,19 @@ function IntroSection() {
               </p>
             </div>
 
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-bold text-slate-900 mb-6 leading-tight">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-slate-900 mb-6 leading-tight">
               AI như người kể chuyện
               <br />
-              <span className="font-normal italic text-slate-600">lịch sử</span>
+              lịch sử
             </h2>
 
-            <p className="text-lg text-slate-500 mb-6 font-light leading-relaxed">
+            <p className="text-base sm:text-lg text-slate-500 mb-6 leading-relaxed">
               WikiChatbot sử dụng công nghệ RAG (Retrieval-Augmented Generation)
               để cung cấp thông tin chính xác, đáng tin cậy về các danh nhân
               Việt Nam.
             </p>
 
-            <p className="text-base text-slate-400 mb-10 leading-relaxed">
+            <p className="text-base sm:text-lg text-slate-500 mb-10 leading-relaxed">
               Không chỉ đơn thuần tra cứu, AI sẽ dẫn dắt bạn qua những câu
               chuyện lịch sử, giúp bạn hiểu sâu hơn về di sản trí tuệ của dân
               tộc.
@@ -524,7 +524,7 @@ function IntroSection() {
             <div className="flex items-center gap-5 sm:gap-8 justify-center lg:justify-start">
               <div>
                 <p className="text-2xl sm:text-3xl font-serif font-bold text-slate-900">
-                  6+
+                  5+
                 </p>
                 <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider">
                   Lĩnh vực
@@ -561,9 +561,10 @@ interface CategoryItem {
   id: string;
   category: string;
   representative: string;
-  years: string;
+  years?: string;
+  totalPeople: number;
   description: string;
-  tagline: string;
+  tagline?: string;
 }
 
 const trimText = (value: string, maxLength: number) => {
@@ -571,23 +572,91 @@ const trimText = (value: string, maxLength: number) => {
   return `${value.slice(0, maxLength).trim()}...`;
 };
 
+const isLikelyTechnicalValue = (value: string) => {
+  const normalized = value.trim();
+  if (!normalized) return false;
+
+  // UUID-like values.
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      normalized,
+    )
+  ) {
+    return true;
+  }
+
+  // Long hex strings are usually ids/hashes, not admin-written content.
+  if (/^[0-9a-f]{16,}$/i.test(normalized)) return true;
+
+  // Long token with no spaces tends to be technical payload.
+  if (/^[A-Za-z0-9_-]{20,}$/.test(normalized) && !/\s/.test(normalized)) {
+    return true;
+  }
+
+  return false;
+};
+
+const pickReadableText = (values: Array<string | null | undefined>) => {
+  const cleaned = values.map((item) => (item || "").trim()).filter(Boolean);
+  if (cleaned.length === 0) return "";
+  return cleaned.find((item) => !isLikelyTechnicalValue(item)) || cleaned[0];
+};
+
+const normalizeForCompare = (value: string) =>
+  value.toLowerCase().replace(/\s+/g, " ").trim();
+
 const buildCategoryItem = (
   category: CategoryListDto,
   details: DetailDto[],
 ): CategoryItem => {
-  const topDetail = details[0];
-  const rawContent = (topDetail?.content || category.description || "").trim();
-  const safeContent = rawContent || "Dữ liệu danh nhân đang được cập nhật.";
+  const backendTotalPeople =
+    typeof (category as CategoryListDto & { detailCount?: number })
+      .detailCount === "number"
+      ? (category as CategoryListDto & { detailCount?: number }).detailCount
+      : undefined;
+
+  const preferredDetail =
+    details.find((detail) => {
+      const readableTitle = pickReadableText([detail.title]);
+      const readableContent = pickReadableText([detail.content]);
+      return Boolean(readableTitle || readableContent);
+    }) || details[0];
+
+  const readableContent = pickReadableText([
+    preferredDetail?.content,
+    category.description,
+  ]);
+  const safeContent =
+    readableContent || "Dữ liệu danh nhân đang được cập nhật.";
+
+  const readableRepresentative = pickReadableText([
+    preferredDetail?.title,
+    category.name,
+    "Danh nhân tiêu biểu",
+  ]);
+
+  const readableTagline = pickReadableText([
+    category.description,
+    preferredDetail?.title,
+  ]);
+
+  const description = trimText(safeContent, 170);
+  const tagline =
+    readableTagline &&
+    normalizeForCompare(readableTagline) !== normalizeForCompare(description)
+      ? trimText(readableTagline, 80)
+      : undefined;
 
   return {
     id: category.id,
     category: category.name || "Danh mục",
-    representative: topDetail?.title || category.name || "Danh nhân tiêu biểu",
-    years: topDetail?.createdAt
-      ? `Cập nhật ${new Date(topDetail.createdAt).toLocaleDateString("vi-VN")}`
-      : "Dữ liệu đang cập nhật",
-    description: trimText(safeContent, 170),
-    tagline: trimText(safeContent, 80),
+    representative: readableRepresentative,
+    years: preferredDetail?.createdAt
+      ? `Cập nhật ${new Date(preferredDetail.createdAt).toLocaleDateString("vi-VN")}`
+      : undefined,
+    totalPeople: backendTotalPeople ?? details.length,
+    description,
+    tagline,
   };
 };
 
@@ -669,8 +738,14 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
         </h3>
 
         {/* Years */}
-        <p className="text-sm font-mono text-slate-400 mb-5 tracking-wider">
-          {item.years}
+        {item.years && (
+          <p className="text-sm font-mono text-slate-400 mb-5 tracking-wider">
+            {item.years}
+          </p>
+        )}
+
+        <p className="text-sm text-slate-500 mb-5 tracking-wide">
+          Tổng danh nhân: {item.totalPeople}
         </p>
 
         {/* Description */}
@@ -679,7 +754,9 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
         </p>
 
         {/* Tagline */}
-        <p className="text-base text-slate-400 mb-10">{item.tagline}</p>
+        {item.tagline && (
+          <p className="text-base text-slate-400 mb-10">{item.tagline}</p>
+        )}
 
         <div
           className={`flex flex-col items-center gap-3 ${isReversed ? "lg:items-end" : "lg:items-start"}`}
@@ -737,7 +814,11 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
 // ==================== CATEGORIES SECTION ====================
 function CategoriesSection() {
   const [categoryItems, setCategoryItems] = useState<CategoryItem[]>(
-    FALLBACK_CATEGORIES.map((item) => ({ ...item, id: String(item.id) })),
+    FALLBACK_CATEGORIES.map((item) => ({
+      ...item,
+      id: String(item.id),
+      totalPeople: 1,
+    })),
   );
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
@@ -1073,9 +1154,9 @@ function Footer() {
         }}
       ></div>
       <div className="max-w-6xl mx-auto relative z-10">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 sm:gap-10">
+        <div className="flex flex-col gap-8 sm:gap-10">
           {/* Logo */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 justify-center sm:justify-start">
             <div className="relative">
               <div className="w-8 h-8 border border-slate-300 rounded-lg"></div>
               <div className="absolute inset-1.5 bg-slate-800 rounded-md"></div>
@@ -1093,32 +1174,67 @@ function Footer() {
             </div>
           </div>
 
-          {/* Links */}
-          <div className="flex items-center gap-6 sm:gap-10 text-sm">
-            <Link
-              href="/chat"
-              className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
-            >
-              Trò chuyện
-            </Link>
-            <Link
-              href="/login"
-              className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
-            >
-              Đăng nhập
-            </Link>
-            <Link
-              href="/register"
-              className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
-            >
-              Đăng ký
-            </Link>
+          {/* Footer columns */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-10 text-center sm:text-left">
+            <div>
+              <div className="flex flex-col gap-2 text-sm">
+                <Link
+                  href="/chat"
+                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
+                >
+                  Trò chuyện
+                </Link>
+                <Link
+                  href="/#categories"
+                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
+                >
+                  Khám phá danh mục
+                </Link>
+                <Link
+                  href="/categories?name=Ch%C3%ADnh%20tr%E1%BB%8B"
+                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
+                >
+                  Chính trị
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex flex-col gap-2 text-sm">
+                <span className="text-slate-500">Giới thiệu</span>
+                <Link
+                  href="/terms"
+                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
+                >
+                  Điều khoản
+                </Link>
+                <Link
+                  href="/privacy-policy"
+                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
+                >
+                  Chính sách bảo mật
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex flex-col gap-2 text-sm">
+                <a
+                  href="https://github.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
+                >
+                  GitHub
+                </a>
+              </div>
+            </div>
           </div>
 
           {/* Copyright */}
-          <div className="text-center lg:text-right">
+          <div className="text-center sm:text-left pt-2">
             <p className="text-xs text-slate-400">
-              © 2025 WikiChatbot · SEP490 Team
+              © 2025 WikiChatbot · SEP490.8 Team
             </p>
             <p className="text-[10px] text-slate-300 mt-1 uppercase tracking-wider">
               Nền tảng tri thức Việt Nam
