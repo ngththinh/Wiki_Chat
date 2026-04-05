@@ -27,6 +27,7 @@ export interface ChatHistoryDto {
   sessionId: string;
   question: string;
   answer: string;
+  aiModel?: string;
   createdAt: string;
 }
 
@@ -46,12 +47,14 @@ export interface CreateChatHistoryDto {
   sessionId: string;
   question: string;
   answer: string;
+  aiModel?: string;
 }
 
 // UpdateChatHistoryDto - PUT /api/history/messages/{id}
 export interface UpdateChatHistoryDto {
   question?: string;
   answer?: string;
+  aiModel?: string;
 }
 
 // =====================
@@ -317,11 +320,17 @@ export const historyService = {
   },
 
   // Create message - POST /api/history/messages
-  async createMessage(sessionId: string, question: string, answer: string): Promise<ApiResponse<ChatHistoryDto>> {
+  async createMessage(
+    sessionId: string,
+    question: string,
+    answer: string,
+    aiModel?: string,
+  ): Promise<ApiResponse<ChatHistoryDto>> {
     const request: CreateChatHistoryDto = {
       sessionId,
       question,
       answer,
+      aiModel,
     };
     return apiClient.post<ChatHistoryDto>('/history/messages', request);
   },

@@ -19,6 +19,20 @@ import { MODELS } from "@/constants";
 
 const CHAT_SIDEBAR_VISIBILITY_KEY = "chatSidebarVisibleDesktop";
 
+const resolveAiModel = (
+  value: unknown,
+  fallback?: ChatModel,
+): ChatModel | undefined => {
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "rag") return MODELS.RAG;
+    if (normalized === "graphrag" || normalized === "graph_rag") {
+      return MODELS.GRAPH_RAG;
+    }
+  }
+  return fallback;
+};
+
 export default function ChatScreen() {
   const [user, setUser] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(true);
@@ -112,6 +126,8 @@ export default function ChatScreen() {
       });
 
       if (response.success && response.data) {
+        const responseModel = resolveAiModel(response.data.aiModel, model);
+
         if (response.data.sessionId) {
           questionSessionId = response.data.sessionId;
           questionSessionIdRef.current = response.data.sessionId;
@@ -120,7 +136,7 @@ export default function ChatScreen() {
         const aiMessage = createMessage(
           "assistant",
           response.data.answer,
-          model,
+          responseModel,
         );
         const finalMessages = [...updatedMessages, aiMessage];
         setMessages(finalMessages);
@@ -170,6 +186,7 @@ export default function ChatScreen() {
             historySessionId,
             message,
             response.data.answer,
+            responseModel,
           );
           if (saveResult.success) {
             setSidebarRefreshTrigger((prev) => prev + 1);
@@ -194,6 +211,7 @@ export default function ChatScreen() {
             historySessionId,
             message,
             `[Error] ${errorText}`,
+            model,
           );
         }
       }
@@ -236,16 +254,18 @@ export default function ChatScreen() {
         const loadedMessages: Message[] = [];
 
         messagesResponse.data.forEach((historyItem) => {
+          const itemModel = resolveAiModel(historyItem.aiModel, selectedModel);
+
           // Add user message
           if (historyItem.question) {
             loadedMessages.push(
-              createMessage("user", historyItem.question, selectedModel),
+              createMessage("user", historyItem.question, itemModel),
             );
           }
           // Add AI response
           if (historyItem.answer) {
             loadedMessages.push(
-              createMessage("assistant", historyItem.answer, selectedModel),
+              createMessage("assistant", historyItem.answer, itemModel),
             );
           }
         });

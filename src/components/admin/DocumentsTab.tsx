@@ -20,6 +20,9 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
   const [details, setDetails] = useState<DetailDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [wikiLoadingTarget, setWikiLoadingTarget] = useState<
+    "create" | "edit" | null
+  >(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
   const [message, setMessage] = useState<{
     type: "success" | "error";
@@ -72,6 +75,28 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     return details.filter((detail) => detail.categoryId === selectedCategoryId);
   }, [details, selectedCategoryId]);
 
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    categories.forEach((category) => {
+      if (category.id && category.name) {
+        map.set(category.id, category.name);
+      }
+    });
+    return map;
+  }, [categories]);
+
+  const getDetailCategoryLabel = (detail: DetailDto) => {
+    const directName = detail.categoryName?.trim();
+    if (directName) return directName;
+
+    if (detail.categoryId) {
+      const fallbackName = categoryNameById.get(detail.categoryId)?.trim();
+      if (fallbackName) return fallbackName;
+    }
+
+    return "Danh mục chưa xác định";
+  };
+
   const showError = (text: string) => setMessage({ type: "error", text });
   const showSuccess = (text: string) => setMessage({ type: "success", text });
 
@@ -116,6 +141,273 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     setTimeout(() => setMessage(null), 3000);
   };
 
+  const resolveWikipediaName = (rawInput?: string, fallbackTitle?: string) => {
+    const input = (rawInput || "").trim();
+    if (!input) return (fallbackTitle || "").trim();
+
+    try {
+      const parsed = new URL(input);
+      const wikiIndex = parsed.pathname.indexOf("/wiki/");
+      if (wikiIndex >= 0) {
+        const encoded = parsed.pathname.slice(wikiIndex + 6);
+        if (encoded) {
+          return decodeURIComponent(encoded).replace(/_/g, " ").trim();
+        }
+      }
+      return input;
+    } catch {
+      return input;
+    }
+  };
+
+  const normalizeText = (value?: string | null) =>
+    (value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const extractWikipediaResult = (
+    responseData?: {
+      wikipediaTitle?: string;
+      wikipediaExtract?: string;
+      wikipediaUrl?: string;
+      data?: Record<string, unknown> | null;
+    } | null,
+  ) => {
+    const nested =
+      responseData?.data && typeof responseData.data === "object"
+        ? (responseData.data as Record<string, unknown>)
+        : null;
+
+    const extractedTitle =
+      responseData?.wikipediaTitle ||
+      (typeof nested?.wikipediaTitle === "string"
+        ? nested.wikipediaTitle
+        : undefined) ||
+      (typeof nested?.title === "string" ? nested.title : undefined);
+
+    const extractedContent =
+      responseData?.wikipediaExtract ||
+      (typeof nested?.wikipediaExtract === "string"
+        ? nested.wikipediaExtract
+        : undefined) ||
+      (typeof nested?.extract === "string" ? nested.extract : undefined) ||
+      (typeof nested?.content === "string" ? nested.content : undefined);
+
+    const extractedUrl =
+      responseData?.wikipediaUrl ||
+      (typeof nested?.wikipediaUrl === "string"
+        ? nested.wikipediaUrl
+        : undefined) ||
+      (typeof nested?.url === "string" ? nested.url : undefined);
+
+    return {
+      extractedTitle,
+      extractedContent,
+      extractedUrl,
+    };
+  };
+
+  const handleCreateDetail = async () => {
+    const wikiName = resolveWikipediaName(
+      newDetail.wikipediaUrl,
+      newDetail.title,
+    );
+    if (!newDetail.categoryId || !newDetail.title.trim()) {
+      showError("Vui lòng nhập đủ danh mục và tiêu đề.");
+      clearMessageSoon();
+      return;
+    }
+
+    if (!wikiName) {
+      showError("Vui lòng nhập Wikipedia URL hoặc tiêu đề danh nhân.");
+      clearMessageSoon();
+      return;
+    }
+
+    setSubmitting(true);
+    setWikiLoadingTarget("create");
+
+    const wikiResponse = await adminService.fetchWikipediaContentForDetail({
+      name: wikiName,
+      customTitle: newDetail.title.trim() || undefined,
+      language: "vi",
+      targetPerson: newDetail.title.trim() || wikiName,
+    });
+
+    if (!wikiResponse.success || !wikiResponse.data?.success) {
+      showError(
+        wikiResponse.error ||
+          wikiResponse.data?.message ||
+          "Không thể lấy dữ liệu từ Wikipedia.",
+      );
+      setSubmitting(false);
+      setWikiLoadingTarget(null);
+      clearMessageSoon();
+      return;
+    }
+
+    const { extractedTitle, extractedContent, extractedUrl } =
+      extractWikipediaResult(wikiResponse.data || null);
+
+    const finalTitle = (extractedTitle || newDetail.title || "").trim();
+    const finalWikipediaUrl = (
+      extractedUrl ||
+      newDetail.wikipediaUrl ||
+      ""
+    ).trim();
+
+    const existingDetail = details.find((detail) => {
+      const sameCategory = detail.categoryId === newDetail.categoryId;
+      if (!sameCategory) return false;
+
+      const sameTitle =
+        normalizeText(detail.title) === normalizeText(finalTitle);
+      const sameWikiUrl =
+        finalWikipediaUrl &&
+        normalizeText(detail.wikipediaUrl) === normalizeText(finalWikipediaUrl);
+
+      return sameTitle || Boolean(sameWikiUrl);
+    });
+
+    if (!extractedContent && !existingDetail) {
+      showError(
+        "Wikipedia chưa trả nội dung đầy đủ. Vui lòng bấm Cập nhật lại sau vài giây để lưu bản ghi chi tiết.",
+      );
+      setSubmitting(false);
+      setWikiLoadingTarget(null);
+      clearMessageSoon();
+      return;
+    }
+
+    const finalContent = (
+      extractedContent ||
+      newDetail.content ||
+      existingDetail?.content ||
+      finalTitle
+    ).trim();
+
+    const payload = {
+      title: finalTitle,
+      content: finalContent,
+      wikipediaUrl: finalWikipediaUrl || undefined,
+    };
+
+    const saveResponse = existingDetail
+      ? await adminService.updateAdminDetail(existingDetail.id, payload)
+      : await adminService.createAdminDetail({
+          categoryId: newDetail.categoryId,
+          ...payload,
+        });
+
+    if (saveResponse.success) {
+      showSuccess(
+        extractedContent
+          ? existingDetail
+            ? "Đã cập nhật danh nhân bằng dữ liệu Wikipedia mới nhất."
+            : "Đã tạo danh nhân mới bằng dữ liệu Wikipedia."
+          : existingDetail
+            ? "Đã lưu cập nhật. Backend chưa trả extract ngay, đang giữ nội dung hiện có."
+            : "Đã tạo mới từ thông tin hiện có. Backend chưa trả extract ngay, bạn có thể bấm cập nhật lại sau.",
+      );
+      setNewDetail((prev) => ({
+        ...prev,
+        title: "",
+        content: "",
+        wikipediaUrl: "",
+      }));
+      await loadData();
+    } else {
+      showError(saveResponse.error || "Không thể cập nhật danh nhân.");
+    }
+
+    setSubmitting(false);
+    setWikiLoadingTarget(null);
+    clearMessageSoon();
+  };
+
+  const handleAutoFillEditFromWikipedia = async () => {
+    const wikiName = resolveWikipediaName(
+      editDetailData.wikipediaUrl,
+      editDetailData.title,
+    );
+    if (!wikiName) {
+      showError("Vui lòng nhập Wikipedia URL hoặc tiêu đề danh nhân.");
+      clearMessageSoon();
+      return;
+    }
+
+    setWikiLoadingTarget("edit");
+
+    const response = await adminService.fetchWikipediaContentForDetail({
+      name: wikiName,
+      customTitle: editDetailData.title?.trim() || undefined,
+      language: "vi",
+      targetPerson: editDetailData.title?.trim() || wikiName,
+    });
+
+    if (!response.success || !response.data?.success) {
+      showError(
+        response.error ||
+          response.data?.message ||
+          "Không thể lấy dữ liệu từ Wikipedia.",
+      );
+      setWikiLoadingTarget(null);
+      clearMessageSoon();
+      return;
+    }
+
+    const responseData =
+      response.data?.data && typeof response.data.data === "object"
+        ? (response.data.data as Record<string, unknown>)
+        : null;
+
+    const extractedTitle =
+      response.data?.wikipediaTitle ||
+      (typeof responseData?.wikipediaTitle === "string"
+        ? responseData.wikipediaTitle
+        : undefined) ||
+      (typeof responseData?.title === "string"
+        ? responseData.title
+        : undefined);
+
+    const extractedContent =
+      response.data?.wikipediaExtract ||
+      (typeof responseData?.wikipediaExtract === "string"
+        ? responseData.wikipediaExtract
+        : undefined) ||
+      (typeof responseData?.extract === "string"
+        ? responseData.extract
+        : undefined) ||
+      (typeof responseData?.content === "string"
+        ? responseData.content
+        : undefined);
+
+    const extractedUrl =
+      response.data?.wikipediaUrl ||
+      (typeof responseData?.wikipediaUrl === "string"
+        ? responseData.wikipediaUrl
+        : undefined) ||
+      (typeof responseData?.url === "string" ? responseData.url : undefined);
+
+    setEditDetailData((prev) => ({
+      ...prev,
+      title: prev.title || extractedTitle || prev.title,
+      content: extractedContent?.trim() || prev.content,
+      wikipediaUrl: prev.wikipediaUrl || extractedUrl || prev.wikipediaUrl,
+    }));
+
+    showSuccess(
+      extractedContent
+        ? "Đã lấy dữ liệu từ Wikipedia. Bạn có thể chỉnh lại trước khi lưu."
+        : "Đã gửi yêu cầu theo mẫu mới của BE. Nếu nội dung chưa đổ về ngay, vui lòng bấm lưu sau khi backend xử lý xong.",
+    );
+    setWikiLoadingTarget(null);
+    clearMessageSoon();
+  };
+
   const handleCreateCategory = async () => {
     if (!newCategory.name?.trim()) {
       showError("Tên danh mục không được để trống.");
@@ -135,39 +427,6 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       await loadData();
     } else {
       showError(response.error || "Không thể tạo danh mục.");
-    }
-
-    setSubmitting(false);
-    clearMessageSoon();
-  };
-
-  const handleCreateDetail = async () => {
-    if (!newDetail.categoryId || !newDetail.title.trim()) {
-      showError("Vui lòng nhập đủ danh mục và tiêu đề.");
-      clearMessageSoon();
-      return;
-    }
-
-    setSubmitting(true);
-    const response = await adminService.createAdminDetail({
-      categoryId: newDetail.categoryId,
-      title: newDetail.title.trim(),
-      // Backend currently requires content; fallback to title when create form hides content input.
-      content: newDetail.content.trim() || newDetail.title.trim(),
-      wikipediaUrl: newDetail.wikipediaUrl?.trim() || undefined,
-    });
-
-    if (response.success) {
-      showSuccess("Tạo danh nhân thành công.");
-      setNewDetail((prev) => ({
-        ...prev,
-        title: "",
-        content: "",
-        wikipediaUrl: "",
-      }));
-      await loadData();
-    } else {
-      showError(response.error || "Không thể tạo danh nhân.");
     }
 
     setSubmitting(false);
@@ -491,10 +750,12 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
               />
               <button
                 onClick={handleCreateDetail}
-                disabled={submitting}
+                disabled={submitting || wikiLoadingTarget === "create"}
                 className="md:col-span-2 px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors text-sm font-medium"
               >
-                Cập nhật
+                {wikiLoadingTarget === "create"
+                  ? "Đang cập nhật từ Wikipedia..."
+                  : "Cập nhật"}
               </button>
             </div>
           </div>
@@ -564,7 +825,7 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                           </p>
                           <div className="flex flex-wrap items-center gap-2 mt-1.5">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border bg-slate-50 text-slate-600 border-slate-200">
-                              {detail.categoryName || "Danh mục chưa xác định"}
+                              {getDetailCategoryLabel(detail)}
                             </span>
                             <span className="text-[10px] text-slate-400">
                               {new Date(detail.createdAt).toLocaleDateString(
@@ -760,6 +1021,15 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                 placeholder="Nội dung"
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm resize-y"
               />
+              <button
+                onClick={handleAutoFillEditFromWikipedia}
+                disabled={submitting || wikiLoadingTarget === "edit"}
+                className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60 transition-colors"
+              >
+                {wikiLoadingTarget === "edit"
+                  ? "Đang lấy dữ liệu từ Wikipedia..."
+                  : "Lấy nội dung từ Wikipedia"}
+              </button>
             </div>
             <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
               <button

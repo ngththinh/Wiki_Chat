@@ -622,12 +622,9 @@ const buildCategoryItem = (
       return Boolean(readableTitle || readableContent);
     }) || details[0];
 
-  const readableContent = pickReadableText([
-    preferredDetail?.content,
-    category.description,
-  ]);
-  const safeContent =
-    readableContent || "Dữ liệu danh nhân đang được cập nhật.";
+  const totalPeople = backendTotalPeople ?? details.length;
+
+  const safeContent = `Lĩnh vực ${category.name || "này"} hiện có ${totalPeople} danh nhân, dữ liệu đang được hệ thống cập nhật liên tục.`;
 
   const readableRepresentative = pickReadableText([
     preferredDetail?.title,
@@ -635,17 +632,8 @@ const buildCategoryItem = (
     "Danh nhân tiêu biểu",
   ]);
 
-  const readableTagline = pickReadableText([
-    category.description,
-    preferredDetail?.title,
-  ]);
-
   const description = trimText(safeContent, 170);
-  const tagline =
-    readableTagline &&
-    normalizeForCompare(readableTagline) !== normalizeForCompare(description)
-      ? trimText(readableTagline, 80)
-      : undefined;
+  const tagline = undefined;
 
   return {
     id: category.id,
@@ -654,7 +642,7 @@ const buildCategoryItem = (
     years: preferredDetail?.createdAt
       ? `Cập nhật ${new Date(preferredDetail.createdAt).toLocaleDateString("vi-VN")}`
       : undefined,
-    totalPeople: backendTotalPeople ?? details.length,
+    totalPeople,
     description,
     tagline,
   };
@@ -664,7 +652,7 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
   const isReversed = index % 2 === 1;
 
   const getChatUrl = () => {
-    return `/chat?context=${encodeURIComponent(item.category)}&prompt=${encodeURIComponent(`Hãy cho tôi biết về ${item.representative}`)}`;
+    return `/chat?context=${encodeURIComponent(item.category)}&prompt=${encodeURIComponent(`Hãy giới thiệu tổng quan các danh nhân thuộc lĩnh vực ${item.category}`)}`;
   };
 
   const getViewAllPeopleUrl = () => {
@@ -708,7 +696,7 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
                 {item.category}
               </p>
               <p className="text-xl sm:text-2xl md:text-3xl font-serif font-medium text-white/90 leading-tight">
-                {item.representative}
+                {item.totalPeople} danh nhân
               </p>
             </div>
           </div>
@@ -732,9 +720,9 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
           </p>
         </div>
 
-        {/* Representative name - Large editorial typography */}
+        {/* Category name - Large editorial typography */}
         <h3 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-slate-900 mb-4 leading-[1.05] tracking-tight">
-          {item.representative}
+          {item.category}
         </h3>
 
         {/* Years */}

@@ -113,6 +113,26 @@ export interface UpdateDetailDto {
   wikipediaUrl?: string;
 }
 
+export interface WikipediaGenerateNodeRequestDto {
+  name: string;
+  customTitle?: string;
+  language?: string;
+  targetPerson?: string;
+}
+
+export interface WikipediaGenerateNodeResponseDto {
+  success: boolean;
+  message?: string;
+  graphRagJobId?: string;
+  ragDocumentId?: string;
+  data?: Record<string, unknown> | null;
+
+  // Some deployments may still include these fields directly.
+  wikipediaTitle?: string;
+  wikipediaExtract?: string;
+  wikipediaUrl?: string;
+}
+
 export interface DocumentInfo {
   id: string;
   file_path: string | null;
@@ -687,6 +707,35 @@ export const adminService = {
       }
 
       return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Fetch and normalize content from Wikipedia for admin detail edit/create flows
+  async fetchWikipediaContentForDetail(
+    payload: WikipediaGenerateNodeRequestDto,
+  ): Promise<ApiResponse<WikipediaGenerateNodeResponseDto>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/wikipedia/generate-node`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const data = await safeJsonParse(response);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy dữ liệu Wikipedia (HTTP ${response.status})`,
+        };
+      }
+
+      return { success: true, data };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }

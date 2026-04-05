@@ -20,6 +20,7 @@ export interface ChatResponse {
   question: string;
   answer: string;
   sessionId?: string;
+  aiModel?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -173,6 +174,7 @@ export const chatService = {
         question,
         answer: response.data.answer || 'Không tìm thấy thông tin trong dữ liệu.',
         sessionId,
+        aiModel: MODELS.GRAPH_RAG,
       },
     };
   },

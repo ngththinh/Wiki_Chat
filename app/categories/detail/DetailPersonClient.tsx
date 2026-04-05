@@ -5,43 +5,44 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import adminService, { DetailDto } from "@/lib/adminService";
 
-const trimText = (value: string, maxLength: number) => {
-  if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength).trim()}...`;
-};
-
-export default function CategoryPeopleClient() {
+export default function DetailPersonClient() {
   const searchParams = useSearchParams();
-  const categoryName = searchParams.get("name") || "Danh mục";
 
-  const categoryId = useMemo(() => {
-    const rawId = searchParams.get("categoryId");
+  const detailId = useMemo(() => {
+    const rawId = searchParams.get("id");
     if (!rawId) return "";
     return decodeURIComponent(rawId);
   }, [searchParams]);
 
-  const [details, setDetails] = useState<DetailDto[]>([]);
+  const categoryName = searchParams.get("categoryName") || "Danh mục";
+  const fallbackName = searchParams.get("name") || "Danh nhân";
+
+  const [detail, setDetail] = useState<DetailDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!categoryId) {
+    const loadDetail = async () => {
+      if (!detailId) {
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
-      const response = await adminService.getDetailsByCategory(categoryId);
+      const response = await adminService.getDetail(detailId);
       if (response.success && response.data) {
-        setDetails(response.data);
+        setDetail(response.data);
       } else {
-        setDetails([]);
+        setDetail(null);
       }
       setIsLoading(false);
     };
 
-    loadData();
-  }, [categoryId]);
+    loadDetail();
+  }, [detailId]);
+
+  const personName = detail?.title?.trim() || fallbackName;
+  const personContent = detail?.content?.trim() || "";
+  const wikipediaUrl = detail?.wikipediaUrl?.trim() || "";
 
   return (
     <main className="relative min-h-screen overflow-hidden">
@@ -70,19 +71,19 @@ export default function CategoryPeopleClient() {
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-px bg-slate-300" />
               <p className="text-xs font-medium text-slate-400 uppercase tracking-[0.2em]">
-                Danh mục
+                Hồ sơ danh nhân
               </p>
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-slate-900 tracking-tight leading-[1.05]">
-              {categoryName}
+              {personName}
             </h1>
             <p className="text-slate-500 mt-4 text-base sm:text-lg">
-              Tất cả danh nhân thuộc danh mục này.
+              Thuộc lĩnh vực: {detail?.categoryName || categoryName}
             </p>
           </div>
 
           <Link
-            href="/#categories"
+            href={`/categories?categoryId=${encodeURIComponent(detail?.categoryId || "")}&name=${encodeURIComponent(detail?.categoryName || categoryName)}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
           >
             <svg
@@ -106,41 +107,46 @@ export default function CategoryPeopleClient() {
           <div className="flex items-center justify-center py-24">
             <div className="w-6 h-6 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
           </div>
-        ) : details.length === 0 ? (
+        ) : !detail ? (
           <div className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm px-6 py-14 text-center">
             <p className="text-slate-700 text-lg font-serif mb-2">
-              Chưa có danh nhân
+              Không tìm thấy danh nhân
             </p>
             <p className="text-slate-500 text-sm">
-              Dữ liệu cho danh mục này đang được cập nhật.
+              Dữ liệu chi tiết có thể đã bị thay đổi hoặc chưa sẵn sàng.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-            {details.map((person) => (
-              <article
-                key={person.id}
-                className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 shadow-sm"
-              >
-                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-3">
-                  Danh nhân
-                </p>
-                <h2 className="text-2xl font-serif font-bold text-slate-900 mb-3 leading-tight">
-                  {person.title || "Đang cập nhật"}
-                </h2>
-                <p className="text-slate-600 leading-relaxed mb-6">
-                  {trimText(
-                    (
-                      person.content || "Dữ liệu tiểu sử đang được cập nhật."
-                    ).trim(),
-                    220,
-                  )}
-                </p>
-                <Link
-                  href={`/categories/detail?id=${encodeURIComponent(person.id)}&name=${encodeURIComponent(person.title || "Danh nhân")}&categoryName=${encodeURIComponent(categoryName)}`}
-                  className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+          <section className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 sm:p-8 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium border bg-slate-50 text-slate-600 border-slate-200 uppercase tracking-wide">
+                {detail.categoryName || categoryName}
+              </span>
+              <span className="text-xs text-slate-400">
+                Cập nhật{" "}
+                {new Date(detail.createdAt).toLocaleDateString("vi-VN")}
+              </span>
+            </div>
+
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-slate-900 mb-4 leading-tight">
+              {personName}
+            </h2>
+
+            {personContent && (
+              <p className="text-slate-700 leading-relaxed whitespace-pre-line text-base sm:text-lg mb-8">
+                {personContent}
+              </p>
+            )}
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+              {wikipediaUrl && (
+                <a
+                  href={wikipediaUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
                 >
-                  Thông tin chi tiết
+                  Xem nguồn Wikipedia
                   <svg
                     className="w-4 h-4"
                     fill="none"
@@ -151,13 +157,13 @@ export default function CategoryPeopleClient() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={1.5}
-                      d="M17 8l4 4m0 0l-4 4m4-4H3"
+                      d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5M7.5 9H6a2 2 0 00-2 2v7a2 2 0 002 2h7a2 2 0 002-2v-1.5"
                     />
                   </svg>
-                </Link>
-              </article>
-            ))}
-          </div>
+                </a>
+              )}
+            </div>
+          </section>
         )}
       </div>
     </main>

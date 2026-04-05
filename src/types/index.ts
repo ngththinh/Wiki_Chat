@@ -72,6 +72,7 @@ export interface ChatResponse {
   question: string;
   answer: string;
   sessionId?: string;
+  aiModel?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -108,6 +109,7 @@ export interface ChatHistoryDto {
   sessionId: string;
   question: string;
   answer: string;
+  aiModel?: string;
   createdAt: string;
 }
 
