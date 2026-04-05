@@ -255,17 +255,28 @@ export default function ChatScreen() {
 
         messagesResponse.data.forEach((historyItem) => {
           const itemModel = resolveAiModel(historyItem.aiModel, selectedModel);
+          const itemTimestamp = historyItem.createdAt;
 
           // Add user message
           if (historyItem.question) {
             loadedMessages.push(
-              createMessage("user", historyItem.question, itemModel),
+              createMessage(
+                "user",
+                historyItem.question,
+                itemModel,
+                itemTimestamp,
+              ),
             );
           }
           // Add AI response
           if (historyItem.answer) {
             loadedMessages.push(
-              createMessage("assistant", historyItem.answer, itemModel),
+              createMessage(
+                "assistant",
+                historyItem.answer,
+                itemModel,
+                itemTimestamp,
+              ),
             );
           }
         });

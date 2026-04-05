@@ -44,12 +44,13 @@ export const createMessage = (
   role: "user" | "assistant",
   content: string,
   model?: string,
+  timestamp?: Date | string,
 ): Message => {
   return {
     id: Date.now().toString() + Math.random(),
     role,
     content,
-    timestamp: new Date(),
+    timestamp: timestamp ? new Date(timestamp) : new Date(),
     model,
   };
 };
