@@ -30,10 +30,18 @@ export interface GraphRagChatRequest {
 }
 
 export interface GraphRagChatResponse {
-  success: boolean;
-  answer: string | null;
-  data?: unknown;
+  question?: string;
+  answer?: string | null;
+  sessionId?: string;
+  aiModel?: string;
   error?: string | null;
+  success?: boolean;
+  data?: {
+    answer?: string | null;
+    sessionId?: string;
+    aiModel?: string;
+    error?: string | null;
+  };
 }
 
 // SearchRequest - POST /api/Question/search
@@ -161,20 +169,35 @@ export const chatService = {
       };
     }
 
-    if (!response.data.success) {
+    const graphData = response.data;
+
+    // GraphRAG endpoint can return either a raw payload
+    // { question, answer, sessionId, aiModel }
+    // or a wrapped payload { success, data: { ... } }.
+    if (
+      graphData.success === false ||
+      (graphData.data && graphData.data.error)
+    ) {
       return {
         success: false,
-        error: response.data.error || 'GraphRAG xử lý thất bại',
+        error:
+          graphData.error ||
+          graphData.data?.error ||
+          'GraphRAG xử lý thất bại',
       };
     }
+
+    const resolvedAnswer = graphData.data?.answer ?? graphData.answer;
+    const resolvedSessionId = graphData.data?.sessionId ?? graphData.sessionId ?? sessionId;
+    const resolvedAiModel = graphData.data?.aiModel ?? graphData.aiModel ?? MODELS.GRAPH_RAG;
 
     return {
       success: true,
       data: {
         question,
-        answer: response.data.answer || 'Không tìm thấy thông tin trong dữ liệu.',
-        sessionId,
-        aiModel: MODELS.GRAPH_RAG,
+        answer: resolvedAnswer || 'Không tìm thấy thông tin trong dữ liệu.',
+        sessionId: resolvedSessionId,
+        aiModel: resolvedAiModel,
       },
     };
   },
@@ -366,7 +389,7 @@ export const mockChatService = {
     };
   },
 
-  async deleteDocument(documentId: string): Promise<ApiResponse<void>> {
+  async deleteDocument(): Promise<ApiResponse<void>> {
     await new Promise(resolve => setTimeout(resolve, 500));
     return { success: true };
   },
