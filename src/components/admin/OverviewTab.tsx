@@ -8,6 +8,13 @@ interface OverviewTabProps {
 }
 
 export default function OverviewTab({ stats, dailyStats }: OverviewTabProps) {
+  const normalizedDailyStats = dailyStats.map((day) => ({
+    ...day,
+    newUsers: Number(day.newUsers) || 0,
+    newChatSessions: Number(day.newChatSessions) || 0,
+    newMessages: Number(day.newMessages) || 0,
+  }));
+
   const statCards = [
     {
       label: "Tổng người dùng",
@@ -44,8 +51,11 @@ export default function OverviewTab({ stats, dailyStats }: OverviewTabProps) {
   ];
 
   // Build a simple bar chart for dailyStats
-  const last7Days = dailyStats.slice(-7);
-  const maxMessages = Math.max(...last7Days.map((d) => d.newMessages), 1);
+  const last7Days = normalizedDailyStats.slice(-7);
+  const maxMetricValue = Math.max(
+    ...last7Days.flatMap((d) => [d.newUsers, d.newChatSessions, d.newMessages]),
+    1,
+  );
 
   return (
     <div className="space-y-6">
@@ -103,25 +113,51 @@ export default function OverviewTab({ stats, dailyStats }: OverviewTabProps) {
         ) : (
           <div className="space-y-6">
             {/* Bar chart */}
-            <div className="flex items-end gap-3 h-40">
+            <div className="flex items-center justify-end gap-5 text-[10px] text-slate-500">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                Người dùng
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Phiên chat
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-violet-500" />
+                Tin nhắn
+              </span>
+            </div>
+
+            <div className="flex items-end gap-3 h-44">
               {last7Days.map((day, idx) => {
-                const height = (day.newMessages / maxMessages) * 100;
+                const daySeries = [
+                  { value: day.newUsers, color: "bg-blue-500" },
+                  { value: day.newChatSessions, color: "bg-emerald-500" },
+                  { value: day.newMessages, color: "bg-violet-500" },
+                ];
+
                 return (
                   <div
                     key={idx}
-                    className="flex-1 flex flex-col items-center gap-2"
+                    className="flex-1 flex h-full flex-col items-center gap-2"
                   >
-                    <span className="text-[10px] text-slate-500 font-medium">
-                      {day.newMessages}
-                    </span>
-                    <div
-                      className="w-full relative rounded-t-md overflow-hidden bg-slate-100"
-                      style={{ height: "100%" }}
-                    >
-                      <div
-                        className="absolute bottom-0 w-full bg-linear-to-t from-blue-500 to-blue-400 rounded-t-md transition-all duration-500"
-                        style={{ height: `${Math.max(height, 4)}%` }}
-                      />
+                    <div className="text-[10px] text-slate-500 font-medium">
+                      {day.newUsers}/{day.newChatSessions}/{day.newMessages}
+                    </div>
+                    <div className="w-full flex-1 rounded-md bg-slate-100 p-1.5">
+                      <div className="flex h-full items-end gap-1">
+                        {daySeries.map((item, seriesIdx) => {
+                          const height = (item.value / maxMetricValue) * 100;
+                          return (
+                            <div
+                              key={seriesIdx}
+                              className={`flex-1 rounded-t-sm transition-all duration-500 ${item.color}`}
+                              style={{ height: `${Math.max(height, 3)}%` }}
+                              title={`${item.value}`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
                     <span className="text-[9px] text-slate-400">
                       {new Date(day.date).toLocaleDateString("vi-VN", {
