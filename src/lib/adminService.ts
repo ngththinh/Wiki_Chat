@@ -282,7 +282,7 @@ const normalizeEntityTitle = (value?: string | null): string | null | undefined 
   if (sanitized === undefined || sanitized === null) return sanitized;
 
   return sanitized
-    .replace(/\.(md|txt|markdown)$/i, '')
+    .replace(/\.(md|txt|markdown|html|htm)$/i, '')
     .replace(/_/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

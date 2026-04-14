@@ -8,7 +8,7 @@ import adminService, { DetailDto } from "@/lib/adminService";
 const normalizeEntityName = (value: string) =>
   value
     .trim()
-    .replace(/\.(md|txt|markdown)$/i, "")
+    .replace(/\.(md|txt|markdown|html|htm)$/i, "")
     .replace(/_/g, " ")
     .replace(/\s+/g, " ")
     .trim();
