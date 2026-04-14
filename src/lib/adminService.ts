@@ -90,6 +90,25 @@ export interface DetailDto {
   createdAt: string;
 }
 
+export interface WikipediaPersonSummaryRequestDto {
+  entityName: string;
+  language?: string;
+  isAutoSave?: boolean;
+}
+
+export interface WikipediaPersonSummaryDataDto {
+  name?: string | null;
+  summary?: string | null;
+  sourceUrl?: string | null;
+  extractedDate?: string | null;
+}
+
+export interface WikipediaPersonSummaryResponseDto {
+  status?: string;
+  data?: WikipediaPersonSummaryDataDto | null;
+  message?: string | null;
+}
+
 export interface CreateCategoryDto {
   name: string;
   description?: string;
@@ -131,6 +150,41 @@ export interface WikipediaGenerateNodeResponseDto {
   wikipediaTitle?: string;
   wikipediaExtract?: string;
   wikipediaUrl?: string;
+}
+
+export interface WikipediaDocumentRequestDto {
+  name: string;
+  customTitle?: string;
+  chunkSize?: number;
+  chunkOverlap?: number;
+  language?: string;
+}
+
+export interface WikipediaDocumentResponseDto {
+  success: boolean;
+  message?: string;
+  documentId?: string;
+  jobId?: string;
+  batch_id?: string;
+  jobs?: Array<Record<string, unknown>>;
+  wikipediaTitle?: string;
+  wikipediaExtract?: string;
+  wikipediaUrl?: string;
+}
+
+export interface GraphRagNodeStatusResponseDto {
+  jobId?: string | null;
+  status?: string | null;
+  message?: string | null;
+  [key: string]: unknown;
+}
+
+export interface WikipediaChunkStatusResponseDto {
+  job_id?: string | null;
+  status?: string | null;
+  message?: string | null;
+  error?: string | null;
+  [key: string]: unknown;
 }
 
 export interface DocumentInfo {
@@ -547,6 +601,53 @@ export const adminService = {
     }
   },
 
+  // Get person detail by name from Wikipedia summary endpoint
+  async getPersonSummaryDetail(
+    payload: WikipediaPersonSummaryRequestDto,
+  ): Promise<ApiResponse<DetailDto>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/wikipedia/person-summary`, {
+        method: 'POST',
+        headers: getPublicHeaders(),
+        body: JSON.stringify({
+          entityName: payload.entityName,
+          language: payload.language || 'vi',
+          isAutoSave: payload.isAutoSave ?? false,
+        }),
+      });
+
+      const rawData = (await safeJsonParse(response)) as WikipediaPersonSummaryResponseDto | null;
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error:
+            rawData?.message ||
+            `Lỗi lấy chi tiết danh nhân (HTTP ${response.status})`,
+        };
+      }
+
+      const personSummary = rawData?.data;
+      if (!personSummary) {
+        return { success: false, error: 'Không có dữ liệu chi tiết danh nhân' };
+      }
+
+      const mappedDetail: DetailDto = {
+        id: payload.entityName,
+        title: personSummary.name || payload.entityName,
+        content: personSummary.summary || null,
+        wikipediaUrl: personSummary.sourceUrl || null,
+        categoryId: null,
+        categoryName: null,
+        createdAt: personSummary.extractedDate || new Date().toISOString(),
+      };
+
+      return { success: true, data: mappedDetail };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
   // Get details by category id
   async getDetailsByCategory(categoryId: string): Promise<ApiResponse<DetailDto[]>> {
     try {
@@ -732,6 +833,91 @@ export const adminService = {
             data?.message ||
             data?.detail ||
             `Lỗi lấy dữ liệu Wikipedia (HTTP ${response.status})`,
+        };
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Trigger RAG document creation/chunking from Wikipedia.
+  async createRagDocumentFromWikipedia(
+    payload: WikipediaDocumentRequestDto,
+  ): Promise<ApiResponse<WikipediaDocumentResponseDto>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/wikipedia/chunking`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const data = await safeJsonParse(response);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi tách chunk từ Wikipedia (HTTP ${response.status})`,
+        };
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Check GraphRAG node creation status
+  async getGraphRagNodeStatus(
+    jobId: string,
+  ): Promise<ApiResponse<GraphRagNodeStatusResponseDto>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/graphrag/node-status/${jobId}`, {
+        method: 'GET',
+        headers: getPublicHeaders(),
+      });
+
+      const data = await safeJsonParse(response);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi kiểm tra trạng thái GraphRAG (HTTP ${response.status})`,
+        };
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Check wikipedia chunking status
+  async getWikipediaChunkStatus(
+    jobId: string,
+  ): Promise<ApiResponse<WikipediaChunkStatusResponseDto>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/wikipedia/chunk-status/${jobId}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      const data = await safeJsonParse(response);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi kiểm tra trạng thái chunking (HTTP ${response.status})`,
         };
       }
 

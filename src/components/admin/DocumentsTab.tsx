@@ -168,40 +168,274 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       .replace(/\s+/g, " ")
       .trim();
 
+  const isWikipediaPayloadSuccess = (payload?: unknown) => {
+    if (!payload || typeof payload !== "object") return false;
+
+    const data = payload as Record<string, unknown>;
+    const status =
+      typeof data.status === "string" ? data.status.toLowerCase() : "";
+
+    if (data.success === true) return true;
+    if (status === "success" || status === "ok" || status === "succeeded") {
+      return true;
+    }
+
+    const nested =
+      data.data && typeof data.data === "object"
+        ? (data.data as Record<string, unknown>)
+        : null;
+
+    return Boolean(
+      nested ||
+      typeof data.wikipediaExtract === "string" ||
+      typeof data.summary === "string",
+    );
+  };
+
+  const getStatusText = (payload?: unknown) => {
+    if (!payload || typeof payload !== "object") return "";
+
+    const data = payload as Record<string, unknown>;
+    const directStatus = data.status;
+    if (typeof directStatus === "string") {
+      return directStatus.toLowerCase();
+    }
+
+    const nested =
+      data.data && typeof data.data === "object"
+        ? (data.data as Record<string, unknown>)
+        : null;
+
+    const nestedStatus = nested?.status;
+    if (typeof nestedStatus === "string") {
+      return nestedStatus.toLowerCase();
+    }
+
+    return "";
+  };
+
+  const isDoneStatus = (status: string) =>
+    ["success", "succeeded", "completed", "done", "finished"].includes(status);
+
+  const isFailedStatus = (status: string) =>
+    ["failed", "error", "cancelled", "canceled"].includes(status);
+
+  const isRetryableStatusError = (error?: string) => {
+    const text = (error || "").toLowerCase();
+    return (
+      text.includes("404") ||
+      text.includes("not found") ||
+      text.includes("queued") ||
+      text.includes("failed to fetch job status") ||
+      text.includes("timeout") ||
+      text.includes("timed out") ||
+      text.includes("request was canceled")
+    );
+  };
+
+  const isTimeoutError = (error?: string) => {
+    const text = (error || "").toLowerCase();
+    return (
+      text.includes("timeout") ||
+      text.includes("timed out") ||
+      text.includes("request was canceled")
+    );
+  };
+
+  const isRagStatusBridgeError = (error?: string) => {
+    const text = (error || "").toLowerCase();
+    return text.includes("failed to fetch job status from rag service");
+  };
+
+  const extractJobIdFromText = (value?: string) => {
+    if (!value) return "";
+    const matched = value.match(
+      /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+    );
+    return matched?.[1] || "";
+  };
+
+  const extractGraphJobId = (payload?: unknown) => {
+    if (!payload || typeof payload !== "object") return "";
+
+    const data = payload as Record<string, unknown>;
+    if (typeof data.graphRagJobId === "string") return data.graphRagJobId;
+
+    const nested =
+      data.data && typeof data.data === "object"
+        ? (data.data as Record<string, unknown>)
+        : null;
+
+    if (typeof nested?.graphRagJobId === "string") {
+      return nested.graphRagJobId;
+    }
+
+    if (typeof nested?.jobId === "string") {
+      return nested.jobId;
+    }
+
+    return "";
+  };
+
+  const extractChunkJobId = (payload?: unknown) => {
+    if (!payload || typeof payload !== "object") return "";
+
+    const data = payload as Record<string, unknown>;
+    if (typeof data.jobId === "string") return data.jobId;
+    if (typeof data.job_id === "string") return data.job_id;
+
+    if (typeof data.message === "string") {
+      const extracted = extractJobIdFromText(data.message);
+      if (extracted) return extracted;
+    }
+
+    const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+    for (const item of jobs) {
+      if (!item || typeof item !== "object") continue;
+      const job = item as Record<string, unknown>;
+      if (typeof job.job_id === "string") return job.job_id;
+      if (typeof job.jobId === "string") return job.jobId;
+    }
+
+    const nested =
+      data.data && typeof data.data === "object"
+        ? (data.data as Record<string, unknown>)
+        : null;
+
+    if (typeof nested?.job_id === "string") {
+      return nested.job_id;
+    }
+    if (typeof nested?.jobId === "string") {
+      return nested.jobId;
+    }
+
+    return "";
+  };
+
+  const sleep = (ms: number) =>
+    new Promise<void>((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
+
+  const waitForPipelineSuccess = async (
+    graphJobId: string,
+    chunkJobId: string,
+  ) => {
+    const maxAttempts = 40;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const graphStatusRes =
+        await adminService.getGraphRagNodeStatus(graphJobId);
+      const chunkStatusRes = chunkJobId
+        ? await adminService.getWikipediaChunkStatus(chunkJobId)
+        : { success: false, error: "Chunk jobId chưa sẵn sàng." };
+
+      if (!graphStatusRes.success) {
+        if (
+          isRetryableStatusError(graphStatusRes.error) &&
+          attempt < maxAttempts
+        ) {
+          await sleep(1500);
+          continue;
+        }
+
+        return {
+          success: false,
+          error: graphStatusRes.error || "Không lấy được trạng thái GraphRAG.",
+        };
+      }
+
+      if (!chunkStatusRes.success) {
+        if (
+          isRetryableStatusError(chunkStatusRes.error) &&
+          attempt < maxAttempts
+        ) {
+          await sleep(1500);
+          continue;
+        }
+
+        return {
+          success: false,
+          error: chunkStatusRes.error || "Không lấy được trạng thái chunking.",
+        };
+      }
+
+      const chunkStatusPayload: unknown = chunkStatusRes.data;
+
+      const graphStatus = getStatusText(graphStatusRes.data);
+      const chunkStatus = getStatusText(chunkStatusPayload);
+
+      if (isFailedStatus(graphStatus)) {
+        return {
+          success: false,
+          error: "Tạo node GraphRAG thất bại.",
+        };
+      }
+
+      if (isFailedStatus(chunkStatus)) {
+        return {
+          success: false,
+          error: "Tách chunk cho RAG thất bại.",
+        };
+      }
+
+      if (isDoneStatus(graphStatus) && isDoneStatus(chunkStatus)) {
+        return { success: true };
+      }
+
+      if (attempt < maxAttempts) {
+        await sleep(1500);
+      }
+    }
+
+    return {
+      success: false,
+      error: "Quá thời gian chờ xử lý pipeline (GraphRAG + chunking).",
+    };
+  };
+
   const extractWikipediaResult = (
-    responseData?: {
-      wikipediaTitle?: string;
-      wikipediaExtract?: string;
-      wikipediaUrl?: string;
-      data?: Record<string, unknown> | null;
-    } | null,
+    responseData?: Record<string, unknown> | null,
   ) => {
     const nested =
       responseData?.data && typeof responseData.data === "object"
         ? (responseData.data as Record<string, unknown>)
         : null;
+    const deepNested =
+      nested?.data && typeof nested.data === "object"
+        ? (nested.data as Record<string, unknown>)
+        : null;
+    const roots = [responseData, nested, deepNested].filter(
+      (item): item is Record<string, unknown> => Boolean(item),
+    );
 
-    const extractedTitle =
-      responseData?.wikipediaTitle ||
-      (typeof nested?.wikipediaTitle === "string"
-        ? nested.wikipediaTitle
-        : undefined) ||
-      (typeof nested?.title === "string" ? nested.title : undefined);
+    const pickString = (...values: unknown[]) => {
+      for (const value of values) {
+        if (typeof value === "string" && value.trim()) {
+          return value;
+        }
+      }
+      return undefined;
+    };
 
-    const extractedContent =
-      responseData?.wikipediaExtract ||
-      (typeof nested?.wikipediaExtract === "string"
-        ? nested.wikipediaExtract
-        : undefined) ||
-      (typeof nested?.extract === "string" ? nested.extract : undefined) ||
-      (typeof nested?.content === "string" ? nested.content : undefined);
+    const extractedTitle = pickString(
+      ...roots.flatMap((root) => [root.wikipediaTitle, root.title, root.name]),
+    );
 
-    const extractedUrl =
-      responseData?.wikipediaUrl ||
-      (typeof nested?.wikipediaUrl === "string"
-        ? nested.wikipediaUrl
-        : undefined) ||
-      (typeof nested?.url === "string" ? nested.url : undefined);
+    const extractedContent = pickString(
+      ...roots.flatMap((root) => [
+        root.wikipediaExtract,
+        root.extract,
+        root.content,
+        root.summary,
+        root.description,
+        root.text,
+      ]),
+    );
+
+    const extractedUrl = pickString(
+      ...roots.flatMap((root) => [root.wikipediaUrl, root.url, root.sourceUrl]),
+    );
 
     return {
       extractedTitle,
@@ -230,18 +464,77 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     setSubmitting(true);
     setWikiLoadingTarget("create");
 
-    const wikiResponse = await adminService.fetchWikipediaContentForDetail({
-      name: wikiName,
-      customTitle: newDetail.title.trim() || undefined,
-      language: "vi",
-      targetPerson: newDetail.title.trim() || wikiName,
-    });
+    const [graphResult, ragResult] = await Promise.allSettled([
+      adminService.fetchWikipediaContentForDetail({
+        name: wikiName,
+        customTitle: newDetail.title.trim() || undefined,
+        language: "vi",
+        targetPerson: newDetail.title.trim() || wikiName,
+      }),
+      adminService.createRagDocumentFromWikipedia({
+        name: wikiName,
+        customTitle: newDetail.title.trim() || undefined,
+        chunkSize: 600,
+        chunkOverlap: 150,
+        language: "vi",
+      }),
+    ]);
 
-    if (!wikiResponse.success || !wikiResponse.data?.success) {
+    const graphResponse =
+      graphResult.status === "fulfilled" ? graphResult.value : null;
+    let ragResponse = ragResult.status === "fulfilled" ? ragResult.value : null;
+
+    if (!ragResponse?.success && isRetryableStatusError(ragResponse?.error)) {
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        await sleep(1200);
+        const retryResponse = await adminService.createRagDocumentFromWikipedia(
+          {
+            name: wikiName,
+            customTitle: newDetail.title.trim() || undefined,
+            chunkSize: 600,
+            chunkOverlap: 150,
+            language: "vi",
+          },
+        );
+
+        ragResponse = retryResponse;
+
+        if (retryResponse.success) {
+          break;
+        }
+
+        if (!isRetryableStatusError(retryResponse.error)) {
+          break;
+        }
+      }
+    }
+
+    const isGraphSuccess = Boolean(graphResponse?.success);
+    const isRagSuccess = Boolean(ragResponse?.success);
+
+    const graphError =
+      graphResponse?.error || graphResponse?.data?.message || "";
+    const ragError = ragResponse?.error || ragResponse?.data?.message || "";
+    const graphJobIdFromError = extractJobIdFromText(graphError);
+    const chunkJobIdFromError = extractJobIdFromText(ragError);
+
+    const canContinueGraph = isGraphSuccess || Boolean(graphJobIdFromError);
+    const canContinueRag = isRagSuccess || Boolean(chunkJobIdFromError);
+
+    if (!canContinueGraph || !canContinueRag) {
+      const timeoutHint =
+        canContinueGraph && !canContinueRag && isTimeoutError(ragError)
+          ? "GraphRAG da queue thanh cong, nhung chunking dang timeout o BE (HttpClient 120s)."
+          : "";
+
       showError(
-        wikiResponse.error ||
-          wikiResponse.data?.message ||
-          "Không thể lấy dữ liệu từ Wikipedia.",
+        [
+          timeoutHint,
+          graphError ? `GraphRAG: ${graphError}` : "",
+          ragError ? `Chunking: ${ragError}` : "",
+        ]
+          .filter(Boolean)
+          .join(" | ") || "Không thể lấy dữ liệu từ Wikipedia.",
       );
       setSubmitting(false);
       setWikiLoadingTarget(null);
@@ -249,12 +542,44 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       return;
     }
 
-    const { extractedTitle, extractedContent, extractedUrl } =
-      extractWikipediaResult(wikiResponse.data || null);
+    const graphJobId =
+      extractGraphJobId(graphResponse?.data) || graphJobIdFromError;
+    const chunkJobId =
+      extractChunkJobId(ragResponse?.data) || chunkJobIdFromError;
 
-    const finalTitle = (extractedTitle || newDetail.title || "").trim();
+    if (!graphJobId || !chunkJobId) {
+      showError(
+        "Không lấy được thông tin job để kiểm tra trạng thái pipeline.",
+      );
+      setSubmitting(false);
+      setWikiLoadingTarget(null);
+      clearMessageSoon();
+      return;
+    }
+
+    const pipelineResult = await waitForPipelineSuccess(graphJobId, chunkJobId);
+    if (!pipelineResult.success) {
+      showError(pipelineResult.error || "Pipeline xử lý chưa hoàn tất.");
+      setSubmitting(false);
+      setWikiLoadingTarget(null);
+      clearMessageSoon();
+      return;
+    }
+
+    const { extractedTitle, extractedContent, extractedUrl } =
+      extractWikipediaResult((graphResponse?.data as any) || null);
+
+    const ragExtract = extractWikipediaResult(
+      (ragResponse?.data as any) || null,
+    );
+
+    const resolvedTitle = extractedTitle || ragExtract.extractedTitle;
+    const resolvedContent = extractedContent || ragExtract.extractedContent;
+    const resolvedUrl = extractedUrl || ragExtract.extractedUrl;
+
+    const finalTitle = (resolvedTitle || newDetail.title || "").trim();
     const finalWikipediaUrl = (
-      extractedUrl ||
+      resolvedUrl ||
       newDetail.wikipediaUrl ||
       ""
     ).trim();
@@ -272,18 +597,8 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       return sameTitle || Boolean(sameWikiUrl);
     });
 
-    if (!extractedContent && !existingDetail) {
-      showError(
-        "Wikipedia chưa trả nội dung đầy đủ. Vui lòng bấm Cập nhật lại sau vài giây để lưu bản ghi chi tiết.",
-      );
-      setSubmitting(false);
-      setWikiLoadingTarget(null);
-      clearMessageSoon();
-      return;
-    }
-
     const finalContent = (
-      extractedContent ||
+      resolvedContent ||
       newDetail.content ||
       existingDetail?.content ||
       finalTitle
@@ -304,13 +619,9 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
 
     if (saveResponse.success) {
       showSuccess(
-        extractedContent
-          ? existingDetail
-            ? "Đã cập nhật danh nhân bằng dữ liệu Wikipedia mới nhất."
-            : "Đã tạo danh nhân mới bằng dữ liệu Wikipedia."
-          : existingDetail
-            ? "Đã lưu cập nhật. Backend chưa trả extract ngay, đang giữ nội dung hiện có."
-            : "Đã tạo mới từ thông tin hiện có. Backend chưa trả extract ngay, bạn có thể bấm cập nhật lại sau.",
+        existingDetail
+          ? "Pipeline hoàn tất, đã cập nhật danh nhân theo lĩnh vực đã chọn."
+          : "Pipeline hoàn tất, đã tạo danh nhân theo lĩnh vực đã chọn.",
       );
       setNewDetail((prev) => ({
         ...prev,
@@ -348,10 +659,12 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       targetPerson: editDetailData.title?.trim() || wikiName,
     });
 
-    if (!response.success || !response.data?.success) {
+    if (!response.success || !isWikipediaPayloadSuccess(response.data)) {
       showError(
         response.error ||
-          response.data?.message ||
+          (typeof response.data?.message === "string"
+            ? response.data.message
+            : null) ||
           "Không thể lấy dữ liệu từ Wikipedia.",
       );
       setWikiLoadingTarget(null);
@@ -359,38 +672,10 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       return;
     }
 
-    const responseData =
-      response.data?.data && typeof response.data.data === "object"
-        ? (response.data.data as Record<string, unknown>)
-        : null;
-
-    const extractedTitle =
-      response.data?.wikipediaTitle ||
-      (typeof responseData?.wikipediaTitle === "string"
-        ? responseData.wikipediaTitle
-        : undefined) ||
-      (typeof responseData?.title === "string"
-        ? responseData.title
-        : undefined);
-
-    const extractedContent =
-      response.data?.wikipediaExtract ||
-      (typeof responseData?.wikipediaExtract === "string"
-        ? responseData.wikipediaExtract
-        : undefined) ||
-      (typeof responseData?.extract === "string"
-        ? responseData.extract
-        : undefined) ||
-      (typeof responseData?.content === "string"
-        ? responseData.content
-        : undefined);
-
-    const extractedUrl =
-      response.data?.wikipediaUrl ||
-      (typeof responseData?.wikipediaUrl === "string"
-        ? responseData.wikipediaUrl
-        : undefined) ||
-      (typeof responseData?.url === "string" ? responseData.url : undefined);
+    const { extractedTitle, extractedContent, extractedUrl } =
+      extractWikipediaResult(
+        (response.data as Record<string, unknown> | undefined) || null,
+      );
 
     setEditDetailData((prev) => ({
       ...prev,

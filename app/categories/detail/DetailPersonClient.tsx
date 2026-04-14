@@ -5,6 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import adminService, { DetailDto } from "@/lib/adminService";
 
+const normalizeEntityName = (value: string) =>
+  value
+    .trim()
+    .replace(/\.(md|txt|markdown)$/i, "")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 export default function DetailPersonClient() {
   const searchParams = useSearchParams();
 
@@ -14,6 +22,13 @@ export default function DetailPersonClient() {
     return decodeURIComponent(rawId);
   }, [searchParams]);
 
+  const entityName = useMemo(() => {
+    const rawName = searchParams.get("entityName") || searchParams.get("name");
+    if (!rawName) return "";
+    return decodeURIComponent(rawName);
+  }, [searchParams]);
+
+  const categoryId = searchParams.get("categoryId") || "";
   const categoryName = searchParams.get("categoryName") || "Danh mục";
   const fallbackName = searchParams.get("name") || "Danh nhân";
 
@@ -22,23 +37,61 @@ export default function DetailPersonClient() {
 
   useEffect(() => {
     const loadDetail = async () => {
-      if (!detailId) {
+      if (!detailId && !entityName) {
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
-      const response = await adminService.getDetail(detailId);
-      if (response.success && response.data) {
-        setDetail(response.data);
-      } else {
-        setDetail(null);
+      let dbDetail: DetailDto | null = null;
+      if (detailId) {
+        const dbResponse = await adminService.getDetail(detailId);
+        if (dbResponse.success && dbResponse.data) {
+          dbDetail = dbResponse.data;
+        }
       }
+
+      let summaryDetail: DetailDto | null = null;
+      const candidates = [
+        normalizeEntityName(entityName),
+        normalizeEntityName(fallbackName),
+        normalizeEntityName(dbDetail?.title || ""),
+      ].filter((name, index, arr) => name && arr.indexOf(name) === index);
+
+      for (const candidate of candidates) {
+        const response = await adminService.getPersonSummaryDetail({
+          entityName: candidate,
+          language: "vi",
+          isAutoSave: false,
+        });
+
+        if (response.success && response.data) {
+          summaryDetail = response.data;
+          break;
+        }
+      }
+
+      let mergedDetail: DetailDto | null = null;
+      if (dbDetail && summaryDetail) {
+        mergedDetail = {
+          id: dbDetail.id,
+          title: dbDetail.title || summaryDetail.title,
+          content: summaryDetail.content || dbDetail.content,
+          wikipediaUrl: summaryDetail.wikipediaUrl || dbDetail.wikipediaUrl,
+          categoryId: dbDetail.categoryId,
+          categoryName: dbDetail.categoryName,
+          createdAt: summaryDetail.createdAt || dbDetail.createdAt,
+        };
+      } else {
+        mergedDetail = summaryDetail || dbDetail;
+      }
+
+      setDetail(mergedDetail);
       setIsLoading(false);
     };
 
     loadDetail();
-  }, [detailId]);
+  }, [detailId, entityName, fallbackName]);
 
   const personName = detail?.title?.trim() || fallbackName;
   const personContent = detail?.content?.trim() || "";
@@ -78,12 +131,12 @@ export default function DetailPersonClient() {
               {personName}
             </h1>
             <p className="text-slate-500 mt-4 text-base sm:text-lg">
-              Thuộc lĩnh vực: {detail?.categoryName || categoryName}
+              Thuộc lĩnh vực: {categoryName}
             </p>
           </div>
 
           <Link
-            href={`/categories?categoryId=${encodeURIComponent(detail?.categoryId || "")}&name=${encodeURIComponent(detail?.categoryName || categoryName)}`}
+            href={`/categories?categoryId=${encodeURIComponent(detail?.categoryId || categoryId)}&name=${encodeURIComponent(detail?.categoryName || categoryName)}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
           >
             <svg

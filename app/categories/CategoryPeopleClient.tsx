@@ -137,7 +137,7 @@ export default function CategoryPeopleClient() {
                   )}
                 </p>
                 <Link
-                  href={`/categories/detail?id=${encodeURIComponent(person.id)}&name=${encodeURIComponent(person.title || "Danh nhân")}&categoryName=${encodeURIComponent(categoryName)}`}
+                  href={`/categories/detail?id=${encodeURIComponent(person.id)}&entityName=${encodeURIComponent(person.title || "Danh nhân")}&name=${encodeURIComponent(person.title || "Danh nhân")}&categoryId=${encodeURIComponent(categoryId)}&categoryName=${encodeURIComponent(categoryName)}`}
                   className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
                 >
                   Thông tin chi tiết
