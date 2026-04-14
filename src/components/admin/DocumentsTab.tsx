@@ -75,6 +75,52 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     return details.filter((detail) => detail.categoryId === selectedCategoryId);
   }, [details, selectedCategoryId]);
 
+  const normalizeLookupValue = (value?: string | null) =>
+    (value || "").trim().toLowerCase();
+
+  const categoryDetailCountMap = useMemo(() => {
+    const countsByCategoryId = new Map<string, number>();
+    const countsByCategoryName = new Map<string, number>();
+
+    details.forEach((detail) => {
+      const detailCategoryId = normalizeLookupValue(detail.categoryId);
+      if (detailCategoryId) {
+        countsByCategoryId.set(
+          detailCategoryId,
+          (countsByCategoryId.get(detailCategoryId) || 0) + 1,
+        );
+      }
+
+      const detailCategoryName = normalizeLookupValue(detail.categoryName);
+      if (detailCategoryName) {
+        countsByCategoryName.set(
+          detailCategoryName,
+          (countsByCategoryName.get(detailCategoryName) || 0) + 1,
+        );
+      }
+    });
+
+    const result = new Map<string, number>();
+    categories.forEach((category) => {
+      const normalizedCategoryId = normalizeLookupValue(category.id);
+      const normalizedCategoryName = normalizeLookupValue(category.name);
+      const countFromDetailsById = normalizedCategoryId
+        ? countsByCategoryId.get(normalizedCategoryId) || 0
+        : 0;
+      const countFromDetailsByName = normalizedCategoryName
+        ? countsByCategoryName.get(normalizedCategoryName) || 0
+        : 0;
+      const countFromApi = Number(category.detailCount) || 0;
+
+      result.set(
+        category.id,
+        Math.max(countFromDetailsById, countFromDetailsByName, countFromApi),
+      );
+    });
+
+    return result;
+  }, [categories, details]);
+
   const categoryNameById = useMemo(() => {
     const map = new Map<string, string>();
     categories.forEach((category) => {
@@ -921,7 +967,10 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                           {category.description || "Không có mô tả"}
                         </p>
                         <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
-                          <span>{category.detailCount} danh nhân</span>
+                          <span>
+                            {categoryDetailCountMap.get(category.id) || 0} danh
+                            nhân
+                          </span>
                           <span>
                             {new Date(category.createdAt).toLocaleDateString(
                               "vi-VN",
