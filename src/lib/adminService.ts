@@ -100,6 +100,8 @@ export interface WikipediaPersonSummaryDataDto {
   name?: string | null;
   summary?: string | null;
   sourceUrl?: string | null;
+  wikipediaUrl?: string | null;
+  url?: string | null;
   extractedDate?: string | null;
 }
 
@@ -675,6 +677,30 @@ export const adminService = {
         return { success: false, error: 'Không có dữ liệu chi tiết danh nhân' };
       }
 
+      const summaryRecord = personSummary as Record<string, unknown>;
+      const nestedRecord =
+        summaryRecord.data && typeof summaryRecord.data === 'object'
+          ? (summaryRecord.data as Record<string, unknown>)
+          : null;
+
+      const pickString = (...values: unknown[]) => {
+        for (const value of values) {
+          if (typeof value === 'string' && value.trim()) {
+            return value.trim();
+          }
+        }
+        return null;
+      };
+
+      const resolvedWikipediaUrl = pickString(
+        personSummary.sourceUrl,
+        personSummary.wikipediaUrl,
+        personSummary.url,
+        nestedRecord?.sourceUrl,
+        nestedRecord?.wikipediaUrl,
+        nestedRecord?.url,
+      );
+
       const mappedDetail: DetailDto = {
         id: payload.entityName,
         title:
@@ -682,7 +708,7 @@ export const adminService = {
           (normalizeEntityTitle(payload.entityName) as string | null) ||
           payload.entityName,
         content: (sanitizeEscapedText(personSummary.summary) as string | null) || null,
-        wikipediaUrl: personSummary.sourceUrl || null,
+        wikipediaUrl: resolvedWikipediaUrl,
         categoryId: null,
         categoryName: null,
         createdAt: personSummary.extractedDate || new Date().toISOString(),

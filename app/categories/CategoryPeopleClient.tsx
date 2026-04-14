@@ -130,7 +130,9 @@ export default function CategoryPeopleClient() {
                 person.title || "Đang cập nhật",
               );
               const description = trimText(
-                (person.content || "Dữ liệu tiểu sử đang được cập nhật.").trim(),
+                (
+                  person.content || "Dữ liệu tiểu sử đang được cập nhật."
+                ).trim(),
                 220,
               );
 
@@ -139,34 +141,34 @@ export default function CategoryPeopleClient() {
                   key={person.id}
                   className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 shadow-sm"
                 >
-                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-3">
-                  Danh nhân
-                </p>
-                <h2 className="text-2xl font-serif font-bold text-slate-900 mb-3 leading-tight">
-                  {personTitle}
-                </h2>
-                <p className="text-slate-600 leading-relaxed mb-6 whitespace-pre-line">
-                  {description}
-                </p>
-                <Link
-                  href={`/categories/detail?id=${encodeURIComponent(person.id)}&entityName=${encodeURIComponent(personTitle || "Danh nhân")}&name=${encodeURIComponent(personTitle || "Danh nhân")}&categoryId=${encodeURIComponent(categoryId)}&categoryName=${encodeURIComponent(categoryName)}`}
-                  className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
-                >
-                  Thông tin chi tiết
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-3">
+                    Danh nhân
+                  </p>
+                  <h2 className="text-2xl font-serif font-bold text-slate-900 mb-3 leading-tight">
+                    {personTitle}
+                  </h2>
+                  <p className="text-slate-600 leading-relaxed mb-6 whitespace-pre-line">
+                    {description}
+                  </p>
+                  <Link
+                    href={`/categories/detail?id=${encodeURIComponent(person.id)}&entityName=${encodeURIComponent(personTitle || "Danh nhân")}&name=${encodeURIComponent(personTitle || "Danh nhân")}&categoryId=${encodeURIComponent(categoryId)}&categoryName=${encodeURIComponent(categoryName)}`}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M17 8l4 4m0 0l-4 4m4-4H3"
-                    />
-                  </svg>
-                </Link>
+                    Thông tin chi tiết
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M17 8l4 4m0 0l-4 4m4-4H3"
+                      />
+                    </svg>
+                  </Link>
                 </article>
               );
             })}

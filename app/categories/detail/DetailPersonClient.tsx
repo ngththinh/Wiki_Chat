@@ -98,7 +98,14 @@ export default function DetailPersonClient() {
     [detail?.title, entityName, fallbackName],
   );
   const personContent = detail?.content?.trim() || "";
-  const wikipediaUrl = detail?.wikipediaUrl?.trim() || "";
+  const wikipediaUrl = useMemo(() => {
+    const directUrl = detail?.wikipediaUrl?.trim();
+    if (directUrl) return directUrl;
+
+    if (!personName) return "";
+    const wikiSlug = personName.replace(/\s+/g, "_");
+    return `https://vi.wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}`;
+  }, [detail?.wikipediaUrl, personName]);
 
   return (
     <main className="relative min-h-screen overflow-hidden">
@@ -188,37 +195,25 @@ export default function DetailPersonClient() {
               {personName}
             </h2>
 
+            {wikipediaUrl && (
+              <p className="text-sm text-slate-600 break-all mb-6">
+                Xem thêm ở Wiki:{" "}
+                <a
+                  href={wikipediaUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-blue-600 hover:text-blue-700 underline underline-offset-2"
+                >
+                  {wikipediaUrl}
+                </a>
+              </p>
+            )}
+
             {personContent && (
               <p className="text-slate-700 leading-relaxed whitespace-pre-line text-base sm:text-lg mb-8">
                 {personContent}
               </p>
             )}
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-              {wikipediaUrl && (
-                <a
-                  href={wikipediaUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
-                >
-                  Xem nguồn Wikipedia
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5M7.5 9H6a2 2 0 00-2 2v7a2 2 0 002 2h7a2 2 0 002-2v-1.5"
-                    />
-                  </svg>
-                </a>
-              )}
-            </div>
           </section>
         )}
       </div>
