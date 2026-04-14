@@ -10,6 +10,14 @@ const trimText = (value: string, maxLength: number) => {
   return `${value.slice(0, maxLength).trim()}...`;
 };
 
+const normalizeEntityName = (value: string) =>
+  value
+    .trim()
+    .replace(/\.(md|txt|markdown)$/i, "")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 export default function CategoryPeopleClient() {
   const searchParams = useSearchParams();
   const categoryName = searchParams.get("name") || "Danh mục";
@@ -117,27 +125,31 @@ export default function CategoryPeopleClient() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-            {details.map((person) => (
-              <article
-                key={person.id}
-                className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 shadow-sm"
-              >
+            {details.map((person) => {
+              const personTitle = normalizeEntityName(
+                person.title || "Đang cập nhật",
+              );
+              const description = trimText(
+                (person.content || "Dữ liệu tiểu sử đang được cập nhật.").trim(),
+                220,
+              );
+
+              return (
+                <article
+                  key={person.id}
+                  className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 shadow-sm"
+                >
                 <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-3">
                   Danh nhân
                 </p>
                 <h2 className="text-2xl font-serif font-bold text-slate-900 mb-3 leading-tight">
-                  {person.title || "Đang cập nhật"}
+                  {personTitle}
                 </h2>
-                <p className="text-slate-600 leading-relaxed mb-6">
-                  {trimText(
-                    (
-                      person.content || "Dữ liệu tiểu sử đang được cập nhật."
-                    ).trim(),
-                    220,
-                  )}
+                <p className="text-slate-600 leading-relaxed mb-6 whitespace-pre-line">
+                  {description}
                 </p>
                 <Link
-                  href={`/categories/detail?id=${encodeURIComponent(person.id)}&entityName=${encodeURIComponent(person.title || "Danh nhân")}&name=${encodeURIComponent(person.title || "Danh nhân")}&categoryId=${encodeURIComponent(categoryId)}&categoryName=${encodeURIComponent(categoryName)}`}
+                  href={`/categories/detail?id=${encodeURIComponent(person.id)}&entityName=${encodeURIComponent(personTitle || "Danh nhân")}&name=${encodeURIComponent(personTitle || "Danh nhân")}&categoryId=${encodeURIComponent(categoryId)}&categoryName=${encodeURIComponent(categoryName)}`}
                   className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
                 >
                   Thông tin chi tiết
@@ -155,8 +167,9 @@ export default function CategoryPeopleClient() {
                     />
                   </svg>
                 </Link>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

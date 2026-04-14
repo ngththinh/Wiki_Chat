@@ -93,7 +93,10 @@ export default function DetailPersonClient() {
     loadDetail();
   }, [detailId, entityName, fallbackName]);
 
-  const personName = detail?.title?.trim() || fallbackName;
+  const personName = useMemo(
+    () => normalizeEntityName(detail?.title || entityName || fallbackName),
+    [detail?.title, entityName, fallbackName],
+  );
   const personContent = detail?.content?.trim() || "";
   const wikipediaUrl = detail?.wikipediaUrl?.trim() || "";
 

@@ -264,6 +264,45 @@ const safeJsonParse = async (response: Response) => {
   }
 };
 
+const sanitizeEscapedText = (value?: string | null): string | null | undefined => {
+  if (value === undefined || value === null) return value;
+
+  return value
+    .replace(/\\r\\n|\\n|\\r/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\u00a0/g, ' ')
+    .trim();
+};
+
+const normalizeEntityTitle = (value?: string | null): string | null | undefined => {
+  const sanitized = sanitizeEscapedText(value);
+  if (sanitized === undefined || sanitized === null) return sanitized;
+
+  return sanitized
+    .replace(/\.(md|txt|markdown)$/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const sanitizeDetailDto = (detail: DetailDto): DetailDto => ({
+  ...detail,
+  title: normalizeEntityTitle(detail.title) ?? null,
+  content: sanitizeEscapedText(detail.content) ?? null,
+  categoryName: sanitizeEscapedText(detail.categoryName) ?? null,
+});
+
+const sanitizeDetailPayload = <T extends UpdateDetailDto | CreateDetailDto>(
+  payload: T,
+): T => ({
+  ...payload,
+  title: normalizeEntityTitle(payload.title) as T['title'],
+  content: sanitizeEscapedText(payload.content) as T['content'],
+});
+
 export const adminService = {
   // ==================== STATS ====================
   
@@ -595,7 +634,11 @@ export const adminService = {
       }
 
       const data = await safeJsonParse(response);
-      return { success: true, data };
+      if (!data) {
+        return { success: false, error: 'Không có dữ liệu chi tiết danh nhân' };
+      }
+
+      return { success: true, data: sanitizeDetailDto(data as DetailDto) };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }
@@ -634,8 +677,11 @@ export const adminService = {
 
       const mappedDetail: DetailDto = {
         id: payload.entityName,
-        title: personSummary.name || payload.entityName,
-        content: personSummary.summary || null,
+        title:
+          (normalizeEntityTitle(personSummary.name) as string | null) ||
+          (normalizeEntityTitle(payload.entityName) as string | null) ||
+          payload.entityName,
+        content: (sanitizeEscapedText(personSummary.summary) as string | null) || null,
         wikipediaUrl: personSummary.sourceUrl || null,
         categoryId: null,
         categoryName: null,
@@ -662,7 +708,8 @@ export const adminService = {
       }
 
       const data = await safeJsonParse(response);
-      return { success: true, data: Array.isArray(data) ? data : [] };
+      const list = Array.isArray(data) ? data : [];
+      return { success: true, data: list.map((detail) => sanitizeDetailDto(detail as DetailDto)) };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }
@@ -766,7 +813,8 @@ export const adminService = {
       }
 
       const data = await safeJsonParse(response);
-      return { success: true, data: Array.isArray(data) ? data : [] };
+      const list = Array.isArray(data) ? data : [];
+      return { success: true, data: list.map((detail) => sanitizeDetailDto(detail as DetailDto)) };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }
@@ -775,10 +823,11 @@ export const adminService = {
   // Create admin detail
   async createAdminDetail(payload: CreateDetailDto): Promise<ApiResponse<string>> {
     try {
+      const cleanedPayload = sanitizeDetailPayload(payload);
       const response = await fetch(`${API_BASE_URL}/admin/details`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(cleanedPayload),
       });
 
       if (!response.ok) {
@@ -796,10 +845,11 @@ export const adminService = {
   // Update admin detail
   async updateAdminDetail(detailId: string, payload: UpdateDetailDto): Promise<ApiResponse<void>> {
     try {
+      const cleanedPayload = sanitizeDetailPayload(payload);
       const response = await fetch(`${API_BASE_URL}/admin/details/${detailId}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(cleanedPayload),
       });
 
       if (!response.ok) {
