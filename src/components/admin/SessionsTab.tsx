@@ -7,6 +7,7 @@ import ConfirmModal from "@/components/common/ConfirmModal";
 export default function SessionsTab() {
   const [sessions, setSessions] = useState<AdminChatSessionDto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({
     pageNumber: 1,
     pageSize: 10,
@@ -16,7 +17,10 @@ export default function SessionsTab() {
 
   // Modals
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deleteSessionId, setDeleteSessionId] = useState<number | null>(null);
+  const [deleteSessionTarget, setDeleteSessionTarget] = useState<{
+    id: number;
+    sessionId: string;
+  } | null>(null);
   const [deleteUserSessionsModalOpen, setDeleteUserSessionsModalOpen] =
     useState(false);
   const [deleteUserSessionsUserId, setDeleteUserSessionsUserId] = useState<
@@ -26,6 +30,7 @@ export default function SessionsTab() {
   const loadSessions = useCallback(
     async (page: number = 1) => {
       setLoading(true);
+      setError(null);
       const response = await adminService.getChatSessions({
         pageNumber: page,
         pageSize: pagination.pageSize,
@@ -38,6 +43,9 @@ export default function SessionsTab() {
           totalCount: response.data.totalCount,
           totalPages: response.data.totalPages,
         });
+      } else {
+        setSessions([]);
+        setError(response.error || "Không thể tải danh sách phiên chat");
       }
       setLoading(false);
     },
@@ -48,18 +56,28 @@ export default function SessionsTab() {
     loadSessions();
   }, []);
 
-  const handleDeleteSession = (sessionId: number) => {
-    setDeleteSessionId(sessionId);
+  const handleDeleteSession = (session: AdminChatSessionDto) => {
+    setDeleteSessionTarget({
+      id: session.id,
+      sessionId: session.sessionId || "",
+    });
     setDeleteModalOpen(true);
   };
 
   const confirmDeleteSession = async () => {
-    if (deleteSessionId) {
-      await adminService.deleteChatSession(deleteSessionId);
-      loadSessions(pagination.pageNumber);
+    if (deleteSessionTarget !== null) {
+      const identifier =
+        deleteSessionTarget.sessionId || deleteSessionTarget.id;
+      const response = await adminService.deleteChatSession(identifier);
+
+      if (!response.success) {
+        setError(response.error || "Không thể xóa phiên chat");
+      }
+
+      await loadSessions(pagination.pageNumber);
     }
     setDeleteModalOpen(false);
-    setDeleteSessionId(null);
+    setDeleteSessionTarget(null);
   };
 
   const handleDeleteUserSessions = (userId: number) => {
@@ -68,9 +86,16 @@ export default function SessionsTab() {
   };
 
   const confirmDeleteUserSessions = async () => {
-    if (deleteUserSessionsUserId) {
-      await adminService.deleteUserChatSessions(deleteUserSessionsUserId);
-      loadSessions(pagination.pageNumber);
+    if (deleteUserSessionsUserId !== null) {
+      const response = await adminService.deleteUserChatSessions(
+        deleteUserSessionsUserId,
+      );
+
+      if (!response.success) {
+        setError(response.error || "Không thể xóa phiên chat của người dùng");
+      }
+
+      await loadSessions(pagination.pageNumber);
     }
     setDeleteUserSessionsModalOpen(false);
     setDeleteUserSessionsUserId(null);
@@ -80,6 +105,11 @@ export default function SessionsTab() {
     <div className="space-y-4">
       {/* Sessions table */}
       <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl overflow-hidden">
+        {error && (
+          <div className="px-5 pt-4">
+            <p className="text-xs text-red-600">{error}</p>
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
@@ -186,7 +216,7 @@ export default function SessionsTab() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => handleDeleteSession(s.id)}
+                          onClick={() => handleDeleteSession(s)}
                           className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Xóa phiên này"
                         >
@@ -251,7 +281,7 @@ export default function SessionsTab() {
         onConfirm={confirmDeleteSession}
         onCancel={() => {
           setDeleteModalOpen(false);
-          setDeleteSessionId(null);
+          setDeleteSessionTarget(null);
         }}
       />
 

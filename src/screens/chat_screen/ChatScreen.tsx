@@ -18,6 +18,7 @@ import { ChatModel, detectModelFromSubdomain } from "@/utils/subdomain";
 import { MODELS } from "@/constants";
 
 const CHAT_SIDEBAR_VISIBILITY_KEY = "chatSidebarVisibleDesktop";
+const CHAT_ACTIVE_SESSION_KEY = "chatActiveSessionId";
 
 const resolveAiModel = (
   value: unknown,
@@ -49,6 +50,18 @@ export default function ChatScreen() {
   const [prefillMessage, setPrefillMessage] = useState<string | null>(null);
   const [prefillNonce, setPrefillNonce] = useState(0);
   const [isPendingConversation, setIsPendingConversation] = useState(false);
+  const hasRestoredSessionRef = useRef(false);
+
+  const persistActiveSession = (sessionId: string | null) => {
+    if (typeof window === "undefined") return;
+
+    if (!sessionId) {
+      localStorage.removeItem(CHAT_ACTIVE_SESSION_KEY);
+      return;
+    }
+
+    localStorage.setItem(CHAT_ACTIVE_SESSION_KEY, sessionId);
+  };
 
   // Detect subdomain and set model accordingly
   useEffect(() => {
@@ -73,9 +86,14 @@ export default function ChatScreen() {
       );
       setIsGuest(false);
       setMessages([]);
+      hasRestoredSessionRef.current = false;
     } else {
       setIsGuest(true);
       setMessages([]);
+      setCurrentChat(null);
+      sessionIdRef.current = null;
+      questionSessionIdRef.current = null;
+      persistActiveSession(null);
     }
   }, []);
 
@@ -159,6 +177,7 @@ export default function ChatScreen() {
             historySessionId = sessionResponse.data.sessionId;
             sessionIdRef.current = historySessionId;
             setCurrentChat(historySessionId);
+            persistActiveSession(historySessionId);
             setIsPendingConversation(false);
             setSidebarRefreshTrigger((prev) => prev + 1);
 
@@ -175,6 +194,7 @@ export default function ChatScreen() {
               historySessionId = existingSession.data.sessionId;
               sessionIdRef.current = historySessionId;
               setCurrentChat(historySessionId);
+              persistActiveSession(historySessionId);
               setIsPendingConversation(false);
               setSidebarRefreshTrigger((prev) => prev + 1);
             }
@@ -204,6 +224,7 @@ export default function ChatScreen() {
         if (!isGuest && !historySessionId) {
           setIsPendingConversation(false);
           setCurrentChat(null);
+          persistActiveSession(null);
         }
 
         if (!isGuest && historySessionId) {
@@ -234,6 +255,7 @@ export default function ChatScreen() {
     setIsPendingConversation(false);
     sessionIdRef.current = null; // Reset ref
     questionSessionIdRef.current = null;
+    persistActiveSession(null);
 
     if (isGuest) {
       clearMessagesFromStorage();
@@ -249,55 +271,76 @@ export default function ChatScreen() {
         historyService.getSession(sessionId),
       ]);
 
-      if (messagesResponse.success && messagesResponse.data) {
-        // Convert history messages to Message format
-        const loadedMessages: Message[] = [];
-
-        messagesResponse.data.forEach((historyItem) => {
-          const itemModel = resolveAiModel(historyItem.aiModel, selectedModel);
-          const itemTimestamp = historyItem.createdAt;
-
-          // Add user message
-          if (historyItem.question) {
-            loadedMessages.push(
-              createMessage(
-                "user",
-                historyItem.question,
-                itemModel,
-                itemTimestamp,
-              ),
-            );
-          }
-          // Add AI response
-          if (historyItem.answer) {
-            loadedMessages.push(
-              createMessage(
-                "assistant",
-                historyItem.answer,
-                itemModel,
-                itemTimestamp,
-              ),
-            );
-          }
-        });
-
-        setMessages(loadedMessages);
-        setCurrentChat(sessionId);
-        sessionIdRef.current = sessionId; // Update ref
-
-        const selectedQuestionSessionId =
-          sessionResponse.success && sessionResponse.data?.sessionId
-            ? sessionResponse.data.sessionId
-            : null;
-
-        questionSessionIdRef.current = selectedQuestionSessionId;
+      if (!sessionResponse.success || !sessionResponse.data?.sessionId) {
+        persistActiveSession(null);
+        return;
       }
+
+      const historyItems =
+        messagesResponse.success && messagesResponse.data
+          ? messagesResponse.data
+          : [];
+
+      // Convert history messages to Message format
+      const loadedMessages: Message[] = [];
+
+      historyItems.forEach((historyItem) => {
+        const itemModel = resolveAiModel(historyItem.aiModel, selectedModel);
+        const itemTimestamp = historyItem.createdAt;
+
+        if (historyItem.question) {
+          loadedMessages.push(
+            createMessage(
+              "user",
+              historyItem.question,
+              itemModel,
+              itemTimestamp,
+            ),
+          );
+        }
+
+        if (historyItem.answer) {
+          loadedMessages.push(
+            createMessage(
+              "assistant",
+              historyItem.answer,
+              itemModel,
+              itemTimestamp,
+            ),
+          );
+        }
+      });
+
+      const selectedQuestionSessionId = sessionResponse.data.sessionId;
+
+      setMessages(loadedMessages);
+      setCurrentChat(selectedQuestionSessionId);
+      sessionIdRef.current = selectedQuestionSessionId;
+      questionSessionIdRef.current = selectedQuestionSessionId;
+      persistActiveSession(selectedQuestionSessionId);
     } catch (error) {
-      // Error loading messages
+      persistActiveSession(null);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isGuest || hasRestoredSessionRef.current) {
+      return;
+    }
+
+    hasRestoredSessionRef.current = true;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const savedSessionId = localStorage.getItem(CHAT_ACTIVE_SESSION_KEY);
+    if (savedSessionId) {
+      void handleSelectChat(savedSessionId);
+    }
+  }, [isGuest, handleSelectChat]);
 
   const handleRegenerateResponse = () => {
     if (messages.length === 0) return;

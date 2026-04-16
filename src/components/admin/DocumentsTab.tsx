@@ -67,6 +67,8 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     wikipediaUrl: "",
   });
 
+  const normalizeFormValue = (value?: string | null) => (value || "").trim();
+
   const showCategoryManagement = mode !== "details";
   const showDetailManagement = mode !== "categories";
 
@@ -142,6 +144,19 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
 
     return "Danh mục chưa xác định";
   };
+
+  const hasEditDetailChanges = useMemo(() => {
+    if (!editingDetail) return false;
+
+    return (
+      normalizeFormValue(editDetailData.title) !==
+        normalizeFormValue(editingDetail.title) ||
+      normalizeFormValue(editDetailData.content) !==
+        normalizeFormValue(editingDetail.content) ||
+      normalizeFormValue(editDetailData.wikipediaUrl) !==
+        normalizeFormValue(editingDetail.wikipediaUrl)
+    );
+  }, [editingDetail, editDetailData]);
 
   const showError = (text: string) => setMessage({ type: "error", text });
   const showSuccess = (text: string) => setMessage({ type: "success", text });
@@ -852,6 +867,12 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       return;
     }
 
+    if (!hasEditDetailChanges) {
+      showError("Bạn chưa thay đổi thông tin nào để lưu.");
+      clearMessageSoon();
+      return;
+    }
+
     setSubmitting(true);
     const response = await adminService.updateAdminDetail(editingDetail.id, {
       title: editDetailData.title.trim(),
@@ -1015,7 +1036,7 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
                             />
                           </svg>
                         </button>
@@ -1212,7 +1233,7 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
                             />
                           </svg>
                         </button>
@@ -1317,44 +1338,71 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
               <h3 className="text-base font-serif font-bold text-slate-800">
                 Chỉnh sửa danh nhân
               </h3>
+              <p className="text-[11px] text-slate-500 mt-1">
+                ID: {editingDetail.id} &middot; Danh mục:{" "}
+                {getDetailCategoryLabel(editingDetail)}
+              </p>
             </div>
             <div className="p-6 space-y-4">
-              <input
-                type="text"
-                value={editDetailData.title || ""}
-                onChange={(e) =>
-                  setEditDetailData((prev) => ({
-                    ...prev,
-                    title: e.target.value,
-                  }))
-                }
-                placeholder="Tiêu đề"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-              />
-              <input
-                type="text"
-                value={editDetailData.wikipediaUrl || ""}
-                onChange={(e) =>
-                  setEditDetailData((prev) => ({
-                    ...prev,
-                    wikipediaUrl: e.target.value,
-                  }))
-                }
-                placeholder="Wikipedia URL"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-              />
-              <textarea
-                rows={7}
-                value={editDetailData.content || ""}
-                onChange={(e) =>
-                  setEditDetailData((prev) => ({
-                    ...prev,
-                    content: e.target.value,
-                  }))
-                }
-                placeholder="Nội dung"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm resize-y"
-              />
+              <p className="text-xs text-slate-500">
+                Cập nhật tiêu đề, nội dung hoặc đường dẫn Wikipedia rồi bấm Lưu
+                thay đổi.
+              </p>
+
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-1.5">
+                  Tiêu đề <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editDetailData.title || ""}
+                  onChange={(e) =>
+                    setEditDetailData((prev) => ({
+                      ...prev,
+                      title: e.target.value,
+                    }))
+                  }
+                  placeholder="Nhập tiêu đề danh nhân"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-1.5">
+                  Wikipedia URL
+                </label>
+                <input
+                  type="text"
+                  value={editDetailData.wikipediaUrl || ""}
+                  onChange={(e) =>
+                    setEditDetailData((prev) => ({
+                      ...prev,
+                      wikipediaUrl: e.target.value,
+                    }))
+                  }
+                  placeholder="https://vi.wikipedia.org/wiki/..."
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-1.5">
+                  Nội dung <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={7}
+                  value={editDetailData.content || ""}
+                  onChange={(e) =>
+                    setEditDetailData((prev) => ({
+                      ...prev,
+                      content: e.target.value,
+                    }))
+                  }
+                  placeholder="Nhập nội dung tóm tắt danh nhân"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm resize-y"
+                />
+              </div>
+
               <button
                 onClick={handleAutoFillEditFromWikipedia}
                 disabled={submitting || wikiLoadingTarget === "edit"}
@@ -1374,10 +1422,10 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
               </button>
               <button
                 onClick={handleUpdateDetail}
-                disabled={submitting}
+                disabled={submitting || !hasEditDetailChanges}
                 className="px-5 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 text-sm font-medium transition-colors"
               >
-                Lưu
+                Lưu thay đổi
               </button>
             </div>
           </div>

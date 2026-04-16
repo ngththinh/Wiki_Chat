@@ -305,6 +305,76 @@ const sanitizeDetailPayload = <T extends UpdateDetailDto | CreateDetailDto>(
   content: sanitizeEscapedText(payload.content) as T['content'],
 });
 
+const normalizeAdminChatSession = (
+  item: unknown,
+): AdminChatSessionDto | null => {
+  if (!item || typeof item !== 'object') return null;
+
+  const record = item as Record<string, any>;
+
+  const id = Number(record.id ?? record.Id ?? 0);
+  const userId = Number(record.userId ?? record.user_id ?? record.UserId ?? 0);
+  const messageCount = Number(
+    record.messageCount ??
+      record.message_count ??
+      record.MessageCount ??
+      record.totalMessages ??
+      record.TotalMessages ??
+      0,
+  );
+
+  return {
+    id,
+    userId,
+    username: (record.username ?? record.userName ?? record.UserName ?? null) as string | null,
+    sessionId: (record.sessionId ?? record.session_id ?? record.SessionId ?? '') as string,
+    sessionName: (record.sessionName ?? record.session_name ?? record.SessionName ?? null) as string | null,
+    messageCount: Number.isFinite(messageCount) ? messageCount : 0,
+    createdAt: (record.createdAt ?? record.created_at ?? record.CreatedAt ?? new Date().toISOString()) as string,
+    updatedAt:
+      (record.updatedAt ??
+        record.updated_at ??
+        record.UpdatedAt ??
+        record.createdAt ??
+        record.created_at ??
+        record.CreatedAt ??
+        new Date().toISOString()) as string,
+  };
+};
+
+const normalizeAdminChatSessionsPaged = (
+  data: unknown,
+): AdminChatSessionDtoPagedResult => {
+  const record = (data || {}) as Record<string, any>;
+  const rawItems = Array.isArray(record.items)
+    ? record.items
+    : Array.isArray(record.Items)
+      ? record.Items
+      : [];
+  const items = rawItems
+    .map((item) => normalizeAdminChatSession(item))
+    .filter((item): item is AdminChatSessionDto => item !== null);
+
+  const pageSize = Number((record.pageSize ?? record.PageSize ?? items.length) || 10);
+  const totalCount = Number((record.totalCount ?? record.TotalCount ?? items.length) || 0);
+  const pageNumber = Number(record.pageNumber ?? record.PageNumber ?? 1);
+  const totalPages = Number(
+    record.totalPages ??
+      record.TotalPages ??
+      (pageSize > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1),
+  );
+
+  return {
+    items,
+    totalCount,
+    pageNumber,
+    pageSize,
+    totalPages,
+    hasPreviousPage: pageNumber > 1,
+    hasNextPage: pageNumber < totalPages,
+  };
+};
+
 export const adminService = {
   // ==================== STATS ====================
   
@@ -516,7 +586,7 @@ export const adminService = {
       }
 
       const data = await safeJsonParse(response);
-      return { success: true, data };
+      return { success: true, data: normalizeAdminChatSessionsPaged(data) };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }
@@ -543,19 +613,40 @@ export const adminService = {
   },
 
   // Delete chat session
-  async deleteChatSession(sessionId: number): Promise<ApiResponse<void>> {
+  async deleteChatSession(sessionIdOrId: string | number): Promise<ApiResponse<void>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/chat-sessions/${sessionId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
+      const candidates = [
+        String(sessionIdOrId),
+      ];
 
-      if (!response.ok) {
-        const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || 'Lỗi xóa phiên chat' };
+      const asNumber = Number(sessionIdOrId);
+      if (Number.isFinite(asNumber)) {
+        const numeric = String(Math.trunc(asNumber));
+        if (!candidates.includes(numeric)) {
+          candidates.push(numeric);
+        }
       }
 
-      return { success: true };
+      let lastError = 'Lỗi xóa phiên chat';
+
+      for (const candidate of candidates) {
+        const response = await fetch(
+          `${API_BASE_URL}/admin/chat-sessions/${encodeURIComponent(candidate)}`,
+          {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+          },
+        );
+
+        if (response.ok) {
+          return { success: true };
+        }
+
+        const data = await safeJsonParse(response);
+        lastError = data?.message || data?.detail || `Lỗi xóa phiên chat (HTTP ${response.status})`;
+      }
+
+      return { success: false, error: lastError };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }
@@ -564,17 +655,28 @@ export const adminService = {
   // Delete all chat sessions for a user
   async deleteUserChatSessions(userId: number): Promise<ApiResponse<void>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/chat-sessions`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
+      const deleteUrls = [
+        `${API_BASE_URL}/admin/users/${userId}/chat-sessions`,
+        `${API_BASE_URL}/admin/chat-sessions/user/${userId}`,
+      ];
 
-      if (!response.ok) {
+      let lastError = 'Lỗi xóa phiên chat';
+
+      for (const url of deleteUrls) {
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        });
+
+        if (response.ok) {
+          return { success: true };
+        }
+
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || 'Lỗi xóa phiên chat' };
+        lastError = data?.message || data?.detail || `Lỗi xóa phiên chat (HTTP ${response.status})`;
       }
 
-      return { success: true };
+      return { success: false, error: lastError };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }

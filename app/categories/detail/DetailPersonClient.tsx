@@ -201,7 +201,7 @@ export default function DetailPersonClient() {
                 {resolvedCategoryName}
               </span>
               <span className="text-xs text-slate-400">
-                Cập nhật{" "}
+                Ngày tạo{" "}
                 {new Date(detail.createdAt).toLocaleDateString("vi-VN")}
               </span>
             </div>

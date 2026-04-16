@@ -193,14 +193,24 @@ export default function ChatSidebarNav({
   const handleConfirmDelete = async () => {
     if (!deleteTargetId) return;
 
+    const deletingId = deleteTargetId;
+
     try {
-      await historyService.deleteConversation(deleteTargetId);
+      const response = await historyService.deleteConversation(deletingId);
+      if (!response.success) {
+        return;
+      }
+
       setConversationsData((prev) =>
-        prev.filter((conv) => conv.id !== deleteTargetId),
+        prev.filter((conv) => conv.id !== deletingId),
       );
       setPinnedConversations((prev) =>
-        prev.filter((convId) => convId !== deleteTargetId),
+        prev.filter((convId) => convId !== deletingId),
       );
+
+      if (currentChat === deletingId) {
+        onNewChat();
+      }
     } catch (error) {
       // Error deleting
     } finally {
@@ -216,9 +226,14 @@ export default function ChatSidebarNav({
 
   const handleConfirmClearAll = async () => {
     try {
-      await historyService.clearAllSessions();
+      const response = await historyService.clearAllSessions();
+      if (!response.success) {
+        return;
+      }
+
       setConversationsData([]);
       setPinnedConversations([]);
+      onNewChat();
     } catch (error) {
       // Error clearing
     } finally {

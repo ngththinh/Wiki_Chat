@@ -5,8 +5,13 @@ import adminService, { AdminUserDto } from "@/lib/adminService";
 import ConfirmModal from "@/components/common/ConfirmModal";
 
 export default function UsersTab() {
+  const LOCAL_FETCH_PAGE_SIZE = 100;
+  const SEARCH_THRESHOLD = 2;
+
+  const [allUsers, setAllUsers] = useState<AdminUserDto[]>([]);
   const [users, setUsers] = useState<AdminUserDto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [pagination, setPagination] = useState({
@@ -27,32 +32,151 @@ export default function UsersTab() {
     role: "",
   });
 
-  const loadUsers = useCallback(
-    async (page: number = 1) => {
-      setLoading(true);
-      const response = await adminService.getUsers({
-        pageNumber: page,
-        pageSize: pagination.pageSize,
-        searchTerm: searchTerm || undefined,
-        role: roleFilter !== "all" ? roleFilter : undefined,
+  const normalizeRoleForApi = (value?: string) => {
+    if (!value) return undefined;
+
+    const normalized = value.toLowerCase();
+    if (normalized === "admin") return "Admin";
+    if (normalized === "user") return "User";
+    return undefined;
+  };
+
+  const applyLocalFiltersAndPagination = useCallback(
+    (
+      sourceUsers: AdminUserDto[],
+      page: number = 1,
+      options?: { searchTerm?: string; roleFilter?: string },
+    ) => {
+      const effectiveSearchTerm = (options?.searchTerm ?? searchTerm)
+        .trim()
+        .toLowerCase();
+      const shouldApplySearch = effectiveSearchTerm.length >= SEARCH_THRESHOLD;
+      const effectiveRoleFilter = options?.roleFilter ?? roleFilter;
+      const normalizedRoleFilter =
+        effectiveRoleFilter !== "all"
+          ? normalizeRoleForApi(effectiveRoleFilter)?.toLowerCase()
+          : undefined;
+
+      const filtered = sourceUsers.filter((user) => {
+        const roleMatched = normalizedRoleFilter
+          ? user.role?.toLowerCase() === normalizedRoleFilter
+          : true;
+
+        if (!roleMatched) {
+          return false;
+        }
+
+        if (!effectiveSearchTerm || !shouldApplySearch) {
+          return true;
+        }
+
+        const searchText = `${user.username || ""} ${user.email || ""} ${
+          user.fullName || ""
+        }`.toLowerCase();
+
+        return searchText.includes(effectiveSearchTerm);
       });
-      if (response.success && response.data) {
-        setUsers(response.data.items);
-        setPagination({
-          pageNumber: response.data.pageNumber,
-          pageSize: response.data.pageSize,
-          totalCount: response.data.totalCount,
-          totalPages: response.data.totalPages,
-        });
-      }
-      setLoading(false);
+
+      const totalCount = filtered.length;
+      const totalPages =
+        totalCount === 0 ? 0 : Math.ceil(totalCount / pagination.pageSize);
+      const safePage =
+        totalPages === 0 ? 1 : Math.min(Math.max(page, 1), totalPages);
+      const startIndex = (safePage - 1) * pagination.pageSize;
+
+      setUsers(filtered.slice(startIndex, startIndex + pagination.pageSize));
+      setPagination((prev) => ({
+        ...prev,
+        pageNumber: safePage,
+        totalCount,
+        totalPages,
+      }));
     },
     [searchTerm, roleFilter, pagination.pageSize],
   );
 
-  useEffect(() => {
-    loadUsers();
+  const fetchAllUsers = useCallback(async () => {
+    let page = 1;
+    let totalPages = 1;
+    const collectedUsers: AdminUserDto[] = [];
+
+    while (page <= totalPages) {
+      const response = await adminService.getUsers({
+        pageNumber: page,
+        pageSize: LOCAL_FETCH_PAGE_SIZE,
+      });
+
+      if (!response.success || !response.data) {
+        setError(response.error || "Không thể tải danh sách người dùng");
+        return null;
+      }
+
+      collectedUsers.push(...response.data.items);
+      totalPages = response.data.totalPages || 1;
+      page += 1;
+    }
+
+    return collectedUsers;
   }, []);
+
+  const loadUsers = useCallback(
+    async (
+      page: number = 1,
+      options?: {
+        searchTerm?: string;
+        roleFilter?: string;
+        forceReload?: boolean;
+      },
+    ) => {
+      setError(null);
+
+      let sourceUsers = allUsers;
+
+      if (options?.forceReload || allUsers.length === 0) {
+        setLoading(true);
+        const fetchedUsers = await fetchAllUsers();
+        setLoading(false);
+
+        if (!fetchedUsers) {
+          setUsers([]);
+          setPagination((prev) => ({
+            ...prev,
+            pageNumber: 1,
+            totalCount: 0,
+            totalPages: 0,
+          }));
+          return;
+        }
+
+        sourceUsers = fetchedUsers;
+        setAllUsers(fetchedUsers);
+      }
+
+      applyLocalFiltersAndPagination(sourceUsers, page, {
+        searchTerm: options?.searchTerm,
+        roleFilter: options?.roleFilter,
+      });
+    },
+    [allUsers, fetchAllUsers, applyLocalFiltersAndPagination],
+  );
+
+  useEffect(() => {
+    loadUsers(1, { forceReload: true });
+    // Run only once on mount to avoid refetch loop when callback deps change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (allUsers.length === 0) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      loadUsers(1, { searchTerm, roleFilter });
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, roleFilter, allUsers, loadUsers]);
 
   const handleDeleteUser = (userId: number) => {
     setDeleteUserId(userId);
@@ -61,8 +185,12 @@ export default function UsersTab() {
 
   const confirmDelete = async () => {
     if (deleteUserId) {
-      await adminService.deleteUser(deleteUserId);
-      loadUsers(pagination.pageNumber);
+      const response = await adminService.deleteUser(deleteUserId);
+      if (!response.success) {
+        setError(response.error || "Không thể xóa người dùng");
+      } else {
+        await loadUsers(pagination.pageNumber, { forceReload: true });
+      }
     }
     setDeleteModalOpen(false);
     setDeleteUserId(null);
@@ -80,16 +208,29 @@ export default function UsersTab() {
 
   const confirmEdit = async () => {
     if (selectedUser) {
-      await adminService.updateUser(selectedUser.id, editData);
-      loadUsers(pagination.pageNumber);
+      const response = await adminService.updateUser(selectedUser.id, editData);
+      if (!response.success) {
+        setError(response.error || "Không thể cập nhật người dùng");
+      } else {
+        await loadUsers(pagination.pageNumber, { forceReload: true });
+      }
     }
     setEditModalOpen(false);
     setSelectedUser(null);
   };
 
   const handleChangeRole = async (userId: number, newRole: string) => {
-    await adminService.updateUserRole(userId, newRole);
-    loadUsers(pagination.pageNumber);
+    const response = await adminService.updateUserRole(
+      userId,
+      normalizeRoleForApi(newRole) || newRole,
+    );
+
+    if (!response.success) {
+      setError(response.error || "Không thể thay đổi vai trò người dùng");
+      return;
+    }
+
+    await loadUsers(pagination.pageNumber, { forceReload: true });
   };
 
   return (
@@ -126,16 +267,23 @@ export default function UsersTab() {
             className="px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm text-slate-700"
           >
             <option value="all">Tất cả vai trò</option>
-            <option value="admin">Admin</option>
-            <option value="user">User</option>
+            <option value="Admin">Admin</option>
+            <option value="User">User</option>
           </select>
           <button
-            onClick={() => loadUsers(1)}
+            onClick={() => loadUsers(1, { forceReload: true })}
             className="px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
           >
-            Tìm kiếm
+            Làm mới
           </button>
         </div>
+        {searchTerm.trim().length > 0 &&
+          searchTerm.trim().length < SEARCH_THRESHOLD && (
+            <p className="mt-2 text-xs text-slate-500">
+              Nhập ít nhất {SEARCH_THRESHOLD} ký tự để tìm kiếm.
+            </p>
+          )}
+        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       </div>
 
       {/* Users Table */}
