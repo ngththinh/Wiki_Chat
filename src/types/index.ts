@@ -56,6 +56,29 @@ export interface LoginResponse extends LoginResponseDto {}
 export interface RegisterResponse extends LoginResponseDto {}
 
 // =====================
+// Forgot Password Types (matching backend API)
+// =====================
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface VerifyOtpDto {
+  email: string;
+  otp: string;
+}
+
+export interface VerifyOtpResponseDto {
+  resetToken: string;
+  message: string;
+}
+
+export interface SetNewPasswordDto {
+  resetToken: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+// =====================
 // Chat Types (matching backend ChatRequest, ChatResponse)
 // =====================
 export type ChatModel = "RAG" | "GraphRAG";

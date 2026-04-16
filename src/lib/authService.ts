@@ -46,6 +46,27 @@ export interface UpdateProfileDto {
   avatarUrl?: string;
 }
 
+// Forgot Password request/response matching backend API
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface VerifyOtpDto {
+  email: string;
+  otp: string;
+}
+
+export interface VerifyOtpResponseDto {
+  resetToken: string;
+  message: string;
+}
+
+export interface SetNewPasswordDto {
+  resetToken: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 // Legacy interfaces for backwards compatibility
 export interface LoginResponse extends LoginResponseDto {}
 export interface RegisterResponse extends LoginResponseDto {}
@@ -99,6 +120,21 @@ export const getValidAuthToken = (): string | null => {
   if (!token) return null;
   if (hasTokenExpired()) return null;
   return token;
+};
+
+// Helper function to safely parse JSON response
+const safeParseJson = async (response: Response) => {
+  try {
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.warn('⚠️ Response is not JSON:', contentType);
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('❌ JSON parse error:', error);
+    return null;
+  }
 };
 
 // Auth Service
@@ -158,12 +194,12 @@ export const authService = {
         body: JSON.stringify(registerData),
       });
 
-      const data = await response.json();
+      const data = await safeParseJson(response);
 
       if (!response.ok) {
         return {
           success: false,
-          error: data.message || data.detail || 'Đăng ký thất bại',
+          error: data?.message || data?.detail || 'Đăng ký thất bại',
         };
       }
 
@@ -204,12 +240,12 @@ export const authService = {
         body: JSON.stringify(profileData),
       });
 
-      const data = await response.json();
+      const data = await safeParseJson(response);
 
       if (!response.ok) {
         return {
           success: false,
-          error: data.message || data.detail || 'Cập nhật thất bại',
+          error: data?.message || data?.detail || 'Cập nhật thất bại',
         };
       }
 
@@ -257,6 +293,102 @@ export const authService = {
   // Get auth token
   getToken() {
     return getValidAuthToken();
+  },
+
+  // Forgot Password - Step 1: Request OTP
+  async forgotPassword(email: string): Promise<ApiResponse<{ message: string }>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email } as ForgotPasswordDto),
+      });
+
+      const data = await safeParseJson(response);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data?.message || data?.detail || 'Không thể gửi OTP. Vui lòng thử lại.',
+        };
+      }
+
+      return {
+        success: true,
+        data: data || { message: 'OTP đã được gửi' },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Lỗi kết nối. Vui lòng kiểm tra mạng.',
+      };
+    }
+  },
+
+  // Verify OTP - Step 2: Verify OTP and get reset token
+  async verifyOtp(email: string, otp: string): Promise<ApiResponse<VerifyOtpResponseDto>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, otp } as VerifyOtpDto),
+      });
+
+      const data = await safeParseJson(response);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data?.message || data?.detail || 'OTP không hợp lệ. Vui lòng thử lại.',
+        };
+      }
+
+      return {
+        success: true,
+        data: data as VerifyOtpResponseDto,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Lỗi kết nối. Vui lòng kiểm tra mạng.',
+      };
+    }
+  },
+
+  // Set New Password - Step 3: Reset password with reset token
+  async setNewPassword(resetToken: string, newPassword: string, confirmPassword: string): Promise<ApiResponse<{ message: string }>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/set-new-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ resetToken, newPassword, confirmPassword } as SetNewPasswordDto),
+      });
+
+      const data = await safeParseJson(response);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data?.message || data?.detail || 'Không thể cập nhật mật khẩu. Vui lòng thử lại.',
+        };
+      }
+
+      return {
+        success: true,
+        data: data || { message: 'Password reset successful' },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Lỗi kết nối. Vui lòng kiểm tra mạng.',
+      };
+    }
   },
 };
 
