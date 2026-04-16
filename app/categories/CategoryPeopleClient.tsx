@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import adminService, { DetailDto } from "@/lib/adminService";
 
 const trimText = (value: string, maxLength: number) => {
@@ -18,17 +18,31 @@ const normalizeEntityName = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const normalizeSearchText = (value: string) =>
+  normalizeEntityName(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
 export default function CategoryPeopleClient() {
+  const params = useParams<{ categoryId?: string }>();
   const searchParams = useSearchParams();
-  const categoryName = searchParams.get("name") || "Danh mục";
+
+  const categoryIdFromPath = useMemo(() => {
+    if (!params?.categoryId || Array.isArray(params.categoryId)) return "";
+    return decodeURIComponent(params.categoryId);
+  }, [params]);
 
   const categoryId = useMemo(() => {
+    if (categoryIdFromPath) return categoryIdFromPath;
     const rawId = searchParams.get("categoryId");
     if (!rawId) return "";
     return decodeURIComponent(rawId);
-  }, [searchParams]);
+  }, [categoryIdFromPath, searchParams]);
 
   const [details, setDetails] = useState<DetailDto[]>([]);
+  const [categoryNameById, setCategoryNameById] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -39,17 +53,52 @@ export default function CategoryPeopleClient() {
       }
 
       setIsLoading(true);
-      const response = await adminService.getDetailsByCategory(categoryId);
-      if (response.success && response.data) {
-        setDetails(response.data);
+      const [detailsResponse, categoriesResponse] = await Promise.all([
+        adminService.getDetailsByCategory(categoryId),
+        adminService.getCategories(),
+      ]);
+
+      if (detailsResponse.success && detailsResponse.data) {
+        setDetails(detailsResponse.data);
       } else {
         setDetails([]);
       }
+
+      if (categoriesResponse.success && categoriesResponse.data) {
+        const matchedCategory = categoriesResponse.data.find(
+          (item) => item.id === categoryId,
+        );
+        setCategoryNameById(matchedCategory?.name?.trim() || "");
+      } else {
+        setCategoryNameById("");
+      }
+
       setIsLoading(false);
     };
 
-    loadData();
+    void loadData();
   }, [categoryId]);
+
+  const categoryName = useMemo(() => {
+    const detailCategoryName = details.find((item) =>
+      item.categoryName?.trim(),
+    )?.categoryName;
+    return detailCategoryName || categoryNameById || "Danh mục";
+  }, [details, categoryNameById]);
+
+  const normalizedSearchTerm = useMemo(
+    () => normalizeSearchText(searchTerm),
+    [searchTerm],
+  );
+
+  const filteredDetails = useMemo(() => {
+    if (!normalizedSearchTerm) return details;
+
+    return details.filter((person) => {
+      const normalizedTitle = normalizeSearchText(person.title || "");
+      return normalizedTitle.includes(normalizedSearchTerm);
+    });
+  }, [details, normalizedSearchTerm]);
 
   return (
     <main className="relative min-h-screen overflow-hidden">
@@ -73,41 +122,74 @@ export default function CategoryPeopleClient() {
       />
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10 sm:mb-14">
-          <div>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-px bg-slate-300" />
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-[0.2em]">
-                Danh mục
-              </p>
+        <div className="space-y-4 mb-10 sm:mb-14">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div>
+              <Link
+                href="/#categories"
+                className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors mb-4"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                Quay lại danh mục
+              </Link>
+
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-slate-900 tracking-tight leading-[1.05]">
+                {categoryName}
+              </h1>
             </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-slate-900 tracking-tight leading-[1.05]">
-              {categoryName}
-            </h1>
-            <p className="text-slate-500 mt-4 text-base sm:text-lg">
-              Tất cả danh nhân thuộc danh mục này.
-            </p>
           </div>
 
-          <Link
-            href="/#categories"
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Quay lại danh mục
-          </Link>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-slate-500 text-base sm:text-lg">
+              Tất cả danh nhân thuộc danh mục này.
+            </p>
+
+            {details.length > 0 && (
+              <div className="w-full sm:w-auto sm:min-w-80">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Tìm danh nhân theo tên..."
+                    className="w-full rounded-xl border border-slate-200 bg-white/80 px-11 py-3 text-sm text-slate-700 outline-none transition-all focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+                  />
+                  <svg
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="m21 21-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+
+                {normalizedSearchTerm && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Tìm thấy {filteredDetails.length} kết quả với từ khóa "
+                    {searchTerm}"
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -124,54 +206,67 @@ export default function CategoryPeopleClient() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-            {details.map((person) => {
-              const personTitle = normalizeEntityName(
-                person.title || "Đang cập nhật",
-              );
-              const description = trimText(
-                (
-                  person.content || "Dữ liệu tiểu sử đang được cập nhật."
-                ).trim(),
-                220,
-              );
+          <div className="space-y-5">
+            {filteredDetails.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm px-6 py-10 text-center">
+                <p className="text-slate-700 text-lg font-serif mb-2">
+                  Không tìm thấy danh nhân phù hợp
+                </p>
+                <p className="text-slate-500 text-sm">
+                  Thử từ khóa khác hoặc rút gọn từ khóa tìm kiếm.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                {filteredDetails.map((person) => {
+                  const personTitle = normalizeEntityName(
+                    person.title || "Đang cập nhật",
+                  );
+                  const description = trimText(
+                    (
+                      person.content || "Dữ liệu tiểu sử đang được cập nhật."
+                    ).trim(),
+                    220,
+                  );
 
-              return (
-                <article
-                  key={person.id}
-                  className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 shadow-sm"
-                >
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-3">
-                    Danh nhân
-                  </p>
-                  <h2 className="text-2xl font-serif font-bold text-slate-900 mb-3 leading-tight">
-                    {personTitle}
-                  </h2>
-                  <p className="text-slate-600 leading-relaxed mb-6 whitespace-pre-line">
-                    {description}
-                  </p>
-                  <Link
-                    href={`/categories/detail?id=${encodeURIComponent(person.id)}&entityName=${encodeURIComponent(personTitle || "Danh nhân")}&name=${encodeURIComponent(personTitle || "Danh nhân")}&categoryId=${encodeURIComponent(categoryId)}&categoryName=${encodeURIComponent(categoryName)}`}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
-                  >
-                    Thông tin chi tiết
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  return (
+                    <article
+                      key={person.id}
+                      className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 shadow-sm"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M17 8l4 4m0 0l-4 4m4-4H3"
-                      />
-                    </svg>
-                  </Link>
-                </article>
-              );
-            })}
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-3">
+                        Danh nhân
+                      </p>
+                      <h2 className="text-2xl font-serif font-bold text-slate-900 mb-3 leading-tight">
+                        {personTitle}
+                      </h2>
+                      <p className="text-slate-600 leading-relaxed mb-6 whitespace-pre-line">
+                        {description}
+                      </p>
+                      <Link
+                        href={`/categories/detail?id=${encodeURIComponent(person.id)}`}
+                        className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+                      >
+                        Thông tin chi tiết
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M17 8l4 4m0 0l-4 4m4-4H3"
+                          />
+                        </svg>
+                      </Link>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -22,90 +22,71 @@ export default function DetailPersonClient() {
     return decodeURIComponent(rawId);
   }, [searchParams]);
 
-  const entityName = useMemo(() => {
-    const rawName = searchParams.get("entityName") || searchParams.get("name");
-    if (!rawName) return "";
-    return decodeURIComponent(rawName);
-  }, [searchParams]);
-
-  const categoryId = searchParams.get("categoryId") || "";
-  const categoryName = searchParams.get("categoryName") || "Danh mục";
-  const fallbackName = searchParams.get("name") || "Danh nhân";
-
   const [detail, setDetail] = useState<DetailDto | null>(null);
+  const [categoryNameById, setCategoryNameById] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadDetail = async () => {
-      if (!detailId && !entityName) {
+      if (!detailId) {
         setIsLoading(false);
+        setDetail(null);
         return;
       }
 
       setIsLoading(true);
-      let dbDetail: DetailDto | null = null;
-      if (detailId) {
-        const dbResponse = await adminService.getDetail(detailId);
-        if (dbResponse.success && dbResponse.data) {
-          dbDetail = dbResponse.data;
-        }
-      }
-
-      let summaryDetail: DetailDto | null = null;
-      const candidates = [
-        normalizeEntityName(entityName),
-        normalizeEntityName(fallbackName),
-        normalizeEntityName(dbDetail?.title || ""),
-      ].filter((name, index, arr) => name && arr.indexOf(name) === index);
-
-      for (const candidate of candidates) {
-        const response = await adminService.getPersonSummaryDetail({
-          entityName: candidate,
-          language: "vi",
-          isAutoSave: false,
-        });
-
-        if (response.success && response.data) {
-          summaryDetail = response.data;
-          break;
-        }
-      }
-
-      let mergedDetail: DetailDto | null = null;
-      if (dbDetail && summaryDetail) {
-        mergedDetail = {
-          id: dbDetail.id,
-          title: dbDetail.title || summaryDetail.title,
-          content: summaryDetail.content || dbDetail.content,
-          wikipediaUrl: summaryDetail.wikipediaUrl || dbDetail.wikipediaUrl,
-          categoryId: dbDetail.categoryId,
-          categoryName: dbDetail.categoryName,
-          createdAt: summaryDetail.createdAt || dbDetail.createdAt,
-        };
-      } else {
-        mergedDetail = summaryDetail || dbDetail;
-      }
-
-      setDetail(mergedDetail);
+      const dbResponse = await adminService.getDetail(detailId);
+      setDetail(dbResponse.success && dbResponse.data ? dbResponse.data : null);
       setIsLoading(false);
     };
 
     loadDetail();
-  }, [detailId, entityName, fallbackName]);
+  }, [detailId]);
+
+  useEffect(() => {
+    const categoryId = detail?.categoryId?.trim() || "";
+    const categoryName = detail?.categoryName?.trim() || "";
+
+    if (!categoryId || categoryName) {
+      setCategoryNameById("");
+      return;
+    }
+
+    let active = true;
+
+    const loadCategoryName = async () => {
+      const categoriesResponse = await adminService.getCategories();
+      if (!active) return;
+
+      if (categoriesResponse.success && categoriesResponse.data) {
+        const matchedCategory = categoriesResponse.data.find(
+          (item) => item.id === categoryId,
+        );
+        setCategoryNameById(matchedCategory?.name?.trim() || "");
+      } else {
+        setCategoryNameById("");
+      }
+    };
+
+    void loadCategoryName();
+
+    return () => {
+      active = false;
+    };
+  }, [detail?.categoryId, detail?.categoryName]);
 
   const personName = useMemo(
-    () => normalizeEntityName(detail?.title || entityName || fallbackName),
-    [detail?.title, entityName, fallbackName],
+    () => normalizeEntityName(detail?.title || "Danh nhân"),
+    [detail?.title],
   );
+  const resolvedCategoryName =
+    detail?.categoryName?.trim() || categoryNameById || "Danh mục";
+  const resolvedCategoryId = detail?.categoryId || "";
+  const categoryHref = resolvedCategoryId
+    ? `/categories/${encodeURIComponent(resolvedCategoryId)}`
+    : "/#categories";
   const personContent = detail?.content?.trim() || "";
-  const wikipediaUrl = useMemo(() => {
-    const directUrl = detail?.wikipediaUrl?.trim();
-    if (directUrl) return directUrl;
-
-    if (!personName) return "";
-    const wikiSlug = personName.replace(/\s+/g, "_");
-    return `https://vi.wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}`;
-  }, [detail?.wikipediaUrl, personName]);
+  const wikipediaUrl = detail?.wikipediaUrl?.trim() || "";
 
   return (
     <main className="relative min-h-screen overflow-hidden">
@@ -131,22 +112,35 @@ export default function DetailPersonClient() {
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10 sm:mb-14">
           <div>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-px bg-slate-300" />
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-[0.2em]">
-                Hồ sơ danh nhân
-              </p>
-            </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-slate-900 tracking-tight leading-[1.05]">
-              {personName}
-            </h1>
-            <p className="text-slate-500 mt-4 text-base sm:text-lg">
-              Thuộc lĩnh vực: {categoryName}
-            </p>
+            {isLoading ? (
+              <div className="animate-pulse space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-px w-12 bg-slate-300" />
+                  <div className="h-3 w-36 rounded bg-slate-200/80" />
+                </div>
+                <div className="h-12 w-72 rounded-lg bg-slate-200/80 sm:h-14 sm:w-96" />
+                <div className="h-6 w-64 rounded-lg bg-slate-200/70" />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-px bg-slate-300" />
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-[0.2em]">
+                    Hồ sơ danh nhân
+                  </p>
+                </div>
+                <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-slate-900 tracking-tight leading-[1.05]">
+                  {personName}
+                </h1>
+                <p className="text-slate-500 mt-4 text-base sm:text-lg">
+                  Thuộc lĩnh vực: {resolvedCategoryName}
+                </p>
+              </>
+            )}
           </div>
 
           <Link
-            href={`/categories?categoryId=${encodeURIComponent(detail?.categoryId || categoryId)}&name=${encodeURIComponent(detail?.categoryName || categoryName)}`}
+            href={categoryHref}
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
           >
             <svg
@@ -167,8 +161,29 @@ export default function DetailPersonClient() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="w-6 h-6 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
+          <div className="space-y-6 animate-pulse">
+            <div className="space-y-3">
+              <div className="h-11 w-2/3 rounded-lg bg-slate-200/80" />
+              <div className="h-6 w-1/3 rounded-lg bg-slate-200/70" />
+            </div>
+
+            <section className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 sm:p-8 shadow-sm">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="h-7 w-32 rounded-lg bg-slate-200/80" />
+                <div className="h-5 w-28 rounded-lg bg-slate-200/70" />
+              </div>
+
+              <div className="mb-4 h-9 w-2/5 rounded-lg bg-slate-200/80" />
+              <div className="mb-3 h-5 w-3/4 rounded-lg bg-slate-200/70" />
+
+              <div className="space-y-2">
+                <div className="h-4 w-full rounded bg-slate-200/70" />
+                <div className="h-4 w-full rounded bg-slate-200/70" />
+                <div className="h-4 w-11/12 rounded bg-slate-200/70" />
+                <div className="h-4 w-10/12 rounded bg-slate-200/70" />
+                <div className="h-4 w-8/12 rounded bg-slate-200/70" />
+              </div>
+            </section>
           </div>
         ) : !detail ? (
           <div className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm px-6 py-14 text-center">
@@ -183,7 +198,7 @@ export default function DetailPersonClient() {
           <section className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 sm:p-8 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
               <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium border bg-slate-50 text-slate-600 border-slate-200 uppercase tracking-wide">
-                {detail.categoryName || categoryName}
+                {resolvedCategoryName}
               </span>
               <span className="text-xs text-slate-400">
                 Cập nhật{" "}

@@ -656,7 +656,7 @@ function CategoryBlock({ item, index }: { item: CategoryItem; index: number }) {
   };
 
   const getViewAllPeopleUrl = () => {
-    return `/categories?categoryId=${encodeURIComponent(item.id)}&name=${encodeURIComponent(item.category)}`;
+    return `/categories/${encodeURIComponent(item.id)}`;
   };
 
   return (
@@ -1179,7 +1179,7 @@ function Footer() {
                   Khám phá danh mục
                 </Link>
                 <Link
-                  href="/categories?name=Ch%C3%ADnh%20tr%E1%BB%8B"
+                  href="/#categories"
                   className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
                 >
                   Chính trị
