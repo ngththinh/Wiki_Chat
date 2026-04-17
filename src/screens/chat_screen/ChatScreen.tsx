@@ -34,6 +34,17 @@ const resolveAiModel = (
   return fallback;
 };
 
+const generateSessionId = (): string => {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 export default function ChatScreen() {
   const [user, setUser] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(true);
@@ -133,13 +144,17 @@ export default function ChatScreen() {
       let historySessionId = sessionIdRef.current;
       let questionSessionId = questionSessionIdRef.current;
 
+      if (!questionSessionId) {
+        questionSessionId = generateSessionId();
+        questionSessionIdRef.current = questionSessionId;
+      }
+
       if (!isGuest && !historySessionId) {
         setIsPendingConversation(true);
       }
 
       const response = await chatService.sendQuestion(message, {
-        sessionId:
-          model === MODELS.RAG ? questionSessionId || undefined : undefined,
+        sessionId: questionSessionId || undefined,
         model,
       });
 
@@ -165,40 +180,17 @@ export default function ChatScreen() {
         }
 
         if (!isGuest && !historySessionId) {
-          const fallbackTitle =
-            message.slice(0, 50) + (message.length > 50 ? "..." : "");
+          historySessionId =
+            response.data.sessionId || questionSessionId || null;
 
-          const sessionResponse = await historyService.createSession(
-            fallbackTitle,
-            questionSessionId || undefined,
-          );
-
-          if (sessionResponse.success && sessionResponse.data) {
-            historySessionId = sessionResponse.data.sessionId;
+          if (historySessionId) {
             sessionIdRef.current = historySessionId;
             setCurrentChat(historySessionId);
             persistActiveSession(historySessionId);
-            setIsPendingConversation(false);
             setSidebarRefreshTrigger((prev) => prev + 1);
-
-            if (!questionSessionId && sessionResponse.data.sessionId) {
-              questionSessionId = sessionResponse.data.sessionId;
-              questionSessionIdRef.current = sessionResponse.data.sessionId;
-            }
-          } else if (questionSessionId) {
-            // Fallback: Question API may have already created the session.
-            const existingSession =
-              await historyService.getSession(questionSessionId);
-
-            if (existingSession.success && existingSession.data) {
-              historySessionId = existingSession.data.sessionId;
-              sessionIdRef.current = historySessionId;
-              setCurrentChat(historySessionId);
-              persistActiveSession(historySessionId);
-              setIsPendingConversation(false);
-              setSidebarRefreshTrigger((prev) => prev + 1);
-            }
           }
+
+          setIsPendingConversation(false);
         }
 
         if (!isGuest && historySessionId) {
@@ -254,7 +246,7 @@ export default function ChatScreen() {
     setCurrentChat(null);
     setIsPendingConversation(false);
     sessionIdRef.current = null; // Reset ref
-    questionSessionIdRef.current = null;
+    questionSessionIdRef.current = generateSessionId();
     persistActiveSession(null);
 
     if (isGuest) {
