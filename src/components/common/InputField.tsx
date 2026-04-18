@@ -9,6 +9,7 @@ interface InputFieldProps {
   required?: boolean;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   error?: string;
   name?: string;
 }
@@ -20,6 +21,7 @@ export default function InputField({
   required = false,
   value,
   onChange,
+  onBlur,
   error,
   name,
 }: InputFieldProps) {
@@ -38,7 +40,9 @@ export default function InputField({
           placeholder={placeholder}
           value={value}
           onChange={onChange}
+          onBlur={onBlur}
           name={name}
+          required={required}
           className={`w-full px-3 sm:px-4 py-3 sm:py-3.5 bg-white/50 backdrop-blur-sm border ${
             error ? "border-red-400" : "border-slate-200"
           } focus:outline-none focus:ring-1 ${

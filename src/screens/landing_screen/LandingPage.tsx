@@ -64,7 +64,7 @@ const FALLBACK_CATEGORIES = [
   },
 ];
 
-const scrollToCategories = () => {
+const scrollToCategories = (options?: { updateHash?: boolean }) => {
   if (typeof window === "undefined") return;
 
   const categoriesSection = document.getElementById("categories");
@@ -83,6 +83,10 @@ const scrollToCategories = () => {
     top: Math.max(targetTop, 0),
     behavior: "smooth",
   });
+
+  if (options?.updateHash && window.location.hash !== "#categories") {
+    window.history.replaceState(null, "", "#categories");
+  }
 };
 
 // ==================== HEADER ====================
@@ -364,7 +368,7 @@ function HeroSection() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-5 sm:gap-8">
           <button
             type="button"
-            onClick={scrollToCategories}
+            onClick={() => scrollToCategories()}
             className="group flex items-center justify-center gap-3 px-8 sm:px-10 py-4 sm:py-5 border border-slate-300/80 bg-white/75 hover:bg-white rounded-xl w-full sm:w-auto text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors duration-300"
           >
             <span>Khám phá danh mục</span>
@@ -1047,7 +1051,7 @@ function CTASection({ isAuthenticated }: { isAuthenticated: boolean }) {
 
               <button
                 type="button"
-                onClick={scrollToCategories}
+                onClick={() => scrollToCategories()}
                 className="group flex items-center gap-3 text-sm font-medium text-white/60 hover:text-white transition-colors duration-300"
               >
                 <span>Xem lại danh mục</span>
@@ -1120,6 +1124,13 @@ function CTASection({ isAuthenticated }: { isAuthenticated: boolean }) {
 
 // ==================== FOOTER ====================
 function Footer() {
+  const handleCategoriesClick = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
+    event.preventDefault();
+    scrollToCategories({ updateHash: true });
+  };
+
   return (
     <footer className="relative py-10 sm:py-16 px-4 sm:px-6 border-t border-slate-200/50 overflow-hidden">
       {/* Base gradient */}
@@ -1163,7 +1174,7 @@ function Footer() {
           </div>
 
           {/* Footer columns */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-10 text-center sm:text-left">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-12 text-center sm:text-left">
             <div>
               <div className="flex flex-col gap-2 text-sm">
                 <Link
@@ -1174,22 +1185,36 @@ function Footer() {
                 </Link>
                 <Link
                   href="/#categories"
+                  onClick={handleCategoriesClick}
                   className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
                 >
                   Khám phá danh mục
-                </Link>
-                <Link
-                  href="/#categories"
-                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
-                >
-                  Chính trị
                 </Link>
               </div>
             </div>
 
             <div>
               <div className="flex flex-col gap-2 text-sm">
-                <span className="text-slate-500">Giới thiệu</span>
+                <Link
+                  href="/#categories"
+                  onClick={handleCategoriesClick}
+                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
+                >
+                  Chính trị
+                </Link>
+                <Link
+                  href="/about"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
+                >
+                  Giới thiệu
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex flex-col gap-2 text-sm">
                 <Link
                   href="/terms"
                   target="_blank"
@@ -1206,19 +1231,6 @@ function Footer() {
                 >
                   Chính sách bảo mật
                 </Link>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex flex-col gap-2 text-sm">
-                <a
-                  href="https://github.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
-                >
-                  GitHub
-                </a>
               </div>
             </div>
           </div>
@@ -1254,6 +1266,65 @@ export default function LandingPage() {
     return () => {
       window.removeEventListener("focus", syncAuthState);
       window.removeEventListener("storage", syncAuthState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleHashCategories = () => {
+      if (window.location.hash === "#categories") {
+        scrollToCategories();
+      }
+    };
+
+    handleHashCategories();
+    window.addEventListener("hashchange", handleHashCategories);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashCategories);
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncHashWithScrollPosition = () => {
+      const categoriesSection = document.getElementById("categories");
+      if (!categoriesSection) return;
+
+      const headerOffset = 96;
+      const activationLine = headerOffset + 24;
+      const rect = categoriesSection.getBoundingClientRect();
+
+      const isInCategoriesViewport =
+        rect.top <= activationLine && rect.bottom > activationLine + 120;
+
+      const hasCategoriesHash = window.location.hash === "#categories";
+
+      if (isInCategoriesViewport && !hasCategoriesHash) {
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}#categories`,
+        );
+        return;
+      }
+
+      if (!isInCategoriesViewport && hasCategoriesHash) {
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}`,
+        );
+      }
+    };
+
+    syncHashWithScrollPosition();
+    window.addEventListener("scroll", syncHashWithScrollPosition, {
+      passive: true,
+    });
+    window.addEventListener("resize", syncHashWithScrollPosition);
+
+    return () => {
+      window.removeEventListener("scroll", syncHashWithScrollPosition);
+      window.removeEventListener("resize", syncHashWithScrollPosition);
     };
   }, []);
 

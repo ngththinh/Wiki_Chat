@@ -27,41 +27,67 @@ interface ValidationErrors {
   general?: string;
 }
 
+type RegisterFieldName = keyof RegisterFormData;
+
+const USERNAME_REGEX =
+  /^(?=.{3,30}$)(?!.*[._]{2})[a-zA-Z][a-zA-Z0-9._]*[a-zA-Z0-9]$/;
+const EMAIL_REGEX =
+  /^(?!.*\.\.)[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}[A-Za-z0-9])?@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z]{2,})+$/;
+const FULL_NAME_REGEX =
+  /^(?=.{2,100}$)(?!.*\s{2,})[\p{L}]+(?:[\s.'-][\p{L}]+)*$/u;
+const STRONG_PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])\S{8,64}$/;
+
+const normalizeRegisterFormData = (
+  data: RegisterFormData,
+): RegisterFormData => ({
+  ...data,
+  username: data.username.trim(),
+  email: data.email.trim().toLowerCase(),
+  fullName: data.fullName.trim().replace(/\s+/g, " "),
+});
+
 // Validation function for register form
 function validateRegisterForm(data: RegisterFormData): ValidationErrors {
   const errors: ValidationErrors = {};
+  const normalizedData = normalizeRegisterFormData(data);
 
   // Username validation
-  if (!data.username.trim()) {
+  if (!normalizedData.username) {
     errors.username = "Vui lòng nhập tên đăng nhập";
-  } else if (data.username.length < 3) {
-    errors.username = "Tên đăng nhập phải có ít nhất 3 ký tự";
-  } else if (!/^[a-zA-Z0-9_]+$/.test(data.username)) {
+  } else if (!USERNAME_REGEX.test(normalizedData.username)) {
     errors.username =
-      "Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới";
+      "Tên đăng nhập 3-30 ký tự, bắt đầu bằng chữ cái, chỉ gồm chữ/số/dấu chấm/gạch dưới và không kết thúc bằng dấu";
   }
 
   // Email validation
-  if (!data.email.trim()) {
+  if (!normalizedData.email) {
     errors.email = "Vui lòng nhập email";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+  } else if (!EMAIL_REGEX.test(normalizedData.email)) {
     errors.email = "Email không hợp lệ";
   }
 
-  // Full name validation (optional but recommended)
-  if (data.fullName && data.fullName.length > 100) {
-    errors.fullName = "Họ tên không được quá 100 ký tự";
+  // Full name validation (optional)
+  if (
+    normalizedData.fullName &&
+    !FULL_NAME_REGEX.test(normalizedData.fullName)
+  ) {
+    errors.fullName =
+      "Họ tên chỉ gồm chữ cái và khoảng trắng hợp lệ, độ dài 2-100 ký tự";
   }
 
   // Password validation
   if (!data.password) {
     errors.password = "Vui lòng nhập mật khẩu";
-  } else if (data.password.length < 6) {
-    errors.password = "Mật khẩu phải có ít nhất 6 ký tự";
+  } else if (!STRONG_PASSWORD_REGEX.test(data.password)) {
+    errors.password =
+      "Mật khẩu 8-64 ký tự, gồm chữ hoa, chữ thường, số, ký tự đặc biệt và không chứa khoảng trắng";
   }
 
   // Confirm password validation
-  if (data.password !== data.confirmPassword) {
+  if (!data.confirmPassword) {
+    errors.confirmPassword = "Vui lòng nhập xác nhận mật khẩu";
+  } else if (data.password !== data.confirmPassword) {
     errors.confirmPassword = "Mật khẩu xác nhận không khớp";
   }
 
@@ -84,24 +110,94 @@ export default function RegisterScreen() {
     acceptTerms: false,
   });
   const [errors, setErrors] = useState<ValidationErrors>({});
+  const [touchedFields, setTouchedFields] = useState<
+    Partial<Record<RegisterFieldName, boolean>>
+  >({});
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const getErrorKeyFromFieldName = (
+    fieldName: RegisterFieldName,
+  ): keyof ValidationErrors => {
+    if (fieldName === "acceptTerms") return "terms";
+    return fieldName as keyof ValidationErrors;
+  };
+
+  const getFieldError = (
+    fieldName: RegisterFieldName,
+    data: RegisterFormData,
+  ): string => {
+    const validationErrors = validateRegisterForm(data);
+    return validationErrors[getErrorKeyFromFieldName(fieldName)] || "";
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    const fieldName = name as RegisterFieldName;
 
-    if (errors[name as keyof ValidationErrors]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
+    setFormData((prev) => {
+      const nextData = {
+        ...prev,
+        [fieldName]: type === "checkbox" ? checked : value,
+      };
+
+      if (!touchedFields[fieldName] && !hasSubmitted) {
+        return nextData;
+      }
+
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        [getErrorKeyFromFieldName(fieldName)]: getFieldError(
+          fieldName,
+          nextData,
+        ),
+        ...(fieldName === "password" || fieldName === "confirmPassword"
+          ? {
+              confirmPassword: getFieldError("confirmPassword", nextData),
+            }
+          : {}),
+      }));
+
+      return nextData;
+    });
+  };
+
+  const handleFieldBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const fieldName = e.target.name as RegisterFieldName;
+    if (!fieldName) return;
+
+    setTouchedFields((prev) => ({ ...prev, [fieldName]: true }));
+
+    const nextData = {
+      ...formData,
+      [fieldName]:
+        e.target.type === "checkbox" ? e.target.checked : e.target.value,
+    };
+
+    setErrors((prev) => ({
+      ...prev,
+      [getErrorKeyFromFieldName(fieldName)]: getFieldError(fieldName, nextData),
+      ...(fieldName === "password"
+        ? { confirmPassword: getFieldError("confirmPassword", nextData) }
+        : {}),
+    }));
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setHasSubmitted(true);
+    setTouchedFields({
+      username: true,
+      email: true,
+      fullName: true,
+      password: true,
+      confirmPassword: true,
+      acceptTerms: true,
+    });
 
-    const validationErrors = validateRegisterForm(formData);
+    const normalizedData = normalizeRegisterFormData(formData);
+
+    const validationErrors = validateRegisterForm(normalizedData);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
@@ -112,10 +208,10 @@ export default function RegisterScreen() {
     try {
       // Create RegisterDto matching backend API
       const registerData: RegisterDto = {
-        username: formData.username,
-        password: formData.password,
-        email: formData.email,
-        fullName: formData.fullName || undefined,
+        username: normalizedData.username,
+        password: normalizedData.password,
+        email: normalizedData.email,
+        fullName: normalizedData.fullName || undefined,
       };
 
       const response = await authService.register(registerData);
@@ -238,7 +334,7 @@ export default function RegisterScreen() {
             <div className="relative">
               <div className="absolute inset-0 bg-white/60 backdrop-blur-sm border border-slate-200/80 shadow-sm" />
               <div className="relative p-5 sm:p-8">
-                <form className="space-y-5" onSubmit={handleSubmit}>
+                <form className="space-y-5" onSubmit={handleSubmit} noValidate>
                   {errors.general && (
                     <div className="p-4 bg-red-50/80 border border-red-200/60 backdrop-blur-sm">
                       <p className="text-red-600 text-sm">{errors.general}</p>
@@ -252,6 +348,7 @@ export default function RegisterScreen() {
                     placeholder="vd: nguyenvana"
                     value={formData.username}
                     onChange={handleInputChange}
+                    onBlur={handleFieldBlur}
                     error={errors.username}
                     required
                   />
@@ -263,6 +360,7 @@ export default function RegisterScreen() {
                     placeholder="vd: email@example.com"
                     value={formData.email}
                     onChange={handleInputChange}
+                    onBlur={handleFieldBlur}
                     error={errors.email}
                     required
                   />
@@ -274,6 +372,7 @@ export default function RegisterScreen() {
                     placeholder="vd: Nguyễn Văn A (tùy chọn)"
                     value={formData.fullName}
                     onChange={handleInputChange}
+                    onBlur={handleFieldBlur}
                     error={errors.fullName}
                   />
 
@@ -281,9 +380,10 @@ export default function RegisterScreen() {
                     label="Mật khẩu"
                     type="password"
                     name="password"
-                    placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
+                    placeholder="8+ ký tự, gồm hoa/thường/số/ký tự đặc biệt"
                     value={formData.password}
                     onChange={handleInputChange}
+                    onBlur={handleFieldBlur}
                     error={errors.password}
                     required
                   />
@@ -295,6 +395,7 @@ export default function RegisterScreen() {
                     placeholder="Nhập lại mật khẩu"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
+                    onBlur={handleFieldBlur}
                     error={errors.confirmPassword}
                     required
                   />
@@ -308,6 +409,7 @@ export default function RegisterScreen() {
                         name="acceptTerms"
                         checked={formData.acceptTerms}
                         onChange={handleInputChange}
+                        onBlur={handleFieldBlur}
                         className="w-4 h-4 mt-0.5 text-slate-700 border-slate-300 focus:ring-slate-500"
                       />
                       <label
