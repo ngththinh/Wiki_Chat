@@ -317,6 +317,8 @@ export default function RegisterScreen() {
                         Tôi đồng ý với{" "}
                         <Link
                           href="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="text-slate-700 border-b border-slate-400 hover:border-slate-700 pb-px transition-colors"
                         >
                           Điều khoản sử dụng
@@ -324,6 +326,8 @@ export default function RegisterScreen() {
                         và{" "}
                         <Link
                           href="/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="text-slate-700 border-b border-slate-400 hover:border-slate-700 pb-px transition-colors"
                         >
                           Chính sách bảo mật
@@ -393,7 +397,7 @@ export default function RegisterScreen() {
             <div className="flex items-center justify-center gap-4 mt-10">
               <div className="w-8 h-px bg-slate-200" />
               <span className="text-[9px] text-slate-400 uppercase tracking-[0.2em]">
-                WikiChatbot · 2025
+                © 2025 WikiChatbot · SEP490.8 Team
               </span>
               <div className="w-8 h-px bg-slate-200" />
             </div>

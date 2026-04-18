@@ -326,7 +326,7 @@ export default function LoginScreen() {
             <div className="flex items-center justify-center gap-4 mt-12">
               <div className="w-8 h-px bg-slate-200" />
               <span className="text-[9px] text-slate-400 uppercase tracking-[0.2em]">
-                WikiChatbot · 2025
+                © 2025 WikiChatbot · SEP490.8 Team
               </span>
               <div className="w-8 h-px bg-slate-200" />
             </div>

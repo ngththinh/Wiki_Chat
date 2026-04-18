@@ -1192,12 +1192,16 @@ function Footer() {
                 <span className="text-slate-500">Giới thiệu</span>
                 <Link
                   href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
                 >
                   Điều khoản
                 </Link>
                 <Link
-                  href="/privacy-policy"
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-slate-500 hover:text-slate-900 transition-colors duration-300"
                 >
                   Chính sách bảo mật
