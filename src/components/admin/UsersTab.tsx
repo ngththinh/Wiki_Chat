@@ -4,6 +4,81 @@ import { useState, useEffect, useCallback } from "react";
 import adminService, { AdminUserDto } from "@/lib/adminService";
 import ConfirmModal from "@/components/common/ConfirmModal";
 
+const CREATE_USER_USERNAME_REGEX =
+  /^(?=.{3,30}$)(?!.*[._]{2})[a-zA-Z][a-zA-Z0-9._]*[a-zA-Z0-9]$/;
+const CREATE_USER_EMAIL_REGEX =
+  /^(?!.*\.\.)[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}[A-Za-z0-9])?@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z]{2,})+$/;
+const CREATE_USER_PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])\S{8,64}$/;
+const CREATE_USER_FULLNAME_REGEX =
+  /^(?=.{2,100}$)(?!.*\s{2,})[\p{L}]+(?:[\s.'-][\p{L}]+)*$/u;
+
+type CreateUserFieldName =
+  | "username"
+  | "email"
+  | "password"
+  | "fullName"
+  | "role";
+
+type CreateUserFieldErrors = Partial<Record<CreateUserFieldName, string>>;
+
+const mapCreateUserErrorMessage = (errorMessage?: string | null): string => {
+  const message = (errorMessage || "").trim();
+  if (!message) return "Không thể tạo người dùng mới";
+
+  const lowercaseMessage = message.toLowerCase();
+  const emailMatch = message.match(
+    /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/,
+  );
+
+  if (
+    /Token\s+\d+\s+is not valid in the scope of module\s+System\.ModuleHandle/i.test(
+      message,
+    )
+  ) {
+    return "Máy chủ đang lỗi xử lý dữ liệu vai trò. Vui lòng thử lại hoặc liên hệ backend để kiểm tra endpoint tạo người dùng.";
+  }
+
+  if (/email.*already exists|duplicate.*email/i.test(message)) {
+    const duplicatedEmail = emailMatch?.[0] || "Email";
+    return `${duplicatedEmail} đã tồn tại trong hệ thống`;
+  }
+
+  if (
+    /username.*already exists|user\s*name.*already exists|duplicate.*username|duplicate.*user/i.test(
+      message,
+    )
+  ) {
+    return "Tên đăng nhập đã tồn tại trong hệ thống";
+  }
+
+  if (/unauthorized|forbidden/i.test(message)) {
+    return "Bạn không có quyền thực hiện thao tác này";
+  }
+
+  if (/bad request|validation|invalid/i.test(message)) {
+    return "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin đã nhập";
+  }
+
+  if (lowercaseMessage.includes("http 400")) {
+    return "Yêu cầu không hợp lệ (HTTP 400)";
+  }
+
+  if (lowercaseMessage.includes("http 401")) {
+    return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại";
+  }
+
+  if (lowercaseMessage.includes("http 403")) {
+    return "Bạn không có quyền thực hiện thao tác này";
+  }
+
+  if (lowercaseMessage.includes("http 500")) {
+    return "Máy chủ đang gặp lỗi. Vui lòng thử lại sau";
+  }
+
+  return "Tạo người dùng thất bại. Vui lòng thử lại";
+};
+
 export default function UsersTab() {
   const LOCAL_FETCH_PAGE_SIZE = 100;
   const SEARCH_THRESHOLD = 2;
@@ -31,6 +106,22 @@ export default function UsersTab() {
     email: "",
     role: "",
   });
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createFieldErrors, setCreateFieldErrors] =
+    useState<CreateUserFieldErrors>({});
+  const [createTouchedFields, setCreateTouchedFields] = useState<
+    Partial<Record<CreateUserFieldName, boolean>>
+  >({});
+  const [createHasSubmitted, setCreateHasSubmitted] = useState(false);
+  const [createData, setCreateData] = useState({
+    username: "",
+    password: "",
+    email: "",
+    fullName: "",
+    role: "User",
+  });
 
   const normalizeRoleForApi = (value?: string) => {
     if (!value) return undefined;
@@ -39,6 +130,140 @@ export default function UsersTab() {
     if (normalized === "admin") return "Admin";
     if (normalized === "user") return "User";
     return undefined;
+  };
+
+  const resetCreateModal = () => {
+    setCreateError(null);
+    setCreateFieldErrors({});
+    setCreateTouchedFields({});
+    setCreateHasSubmitted(false);
+    setCreatingUser(false);
+    setCreateData({
+      username: "",
+      password: "",
+      email: "",
+      fullName: "",
+      role: "User",
+    });
+  };
+
+  const openCreateModal = () => {
+    resetCreateModal();
+    setCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    setCreateModalOpen(false);
+    resetCreateModal();
+  };
+
+  const getCreateUserFieldError = (
+    fieldName: CreateUserFieldName,
+    data: typeof createData = createData,
+  ): string => {
+    const username = data.username.trim();
+    const email = data.email.trim().toLowerCase();
+    const password = data.password;
+    const fullName = data.fullName.trim().replace(/\s+/g, " ");
+    const role = normalizeRoleForApi(data.role);
+
+    if (fieldName === "username") {
+      if (!username) return "Vui lòng nhập tên đăng nhập";
+      if (!CREATE_USER_USERNAME_REGEX.test(username)) {
+        return "Tên đăng nhập 3-30 ký tự, bắt đầu bằng chữ cái, chỉ gồm chữ/số/dấu chấm/gạch dưới";
+      }
+      return "";
+    }
+
+    if (fieldName === "email") {
+      if (!email) return "Vui lòng nhập email";
+      if (!CREATE_USER_EMAIL_REGEX.test(email)) return "Email không hợp lệ";
+      return "";
+    }
+
+    if (fieldName === "password") {
+      if (!password) return "Vui lòng nhập mật khẩu";
+      if (!CREATE_USER_PASSWORD_REGEX.test(password)) {
+        return "Mật khẩu 8-64 ký tự, gồm chữ hoa, chữ thường, số, ký tự đặc biệt và không chứa khoảng trắng";
+      }
+      return "";
+    }
+
+    if (fieldName === "fullName") {
+      if (fullName && !CREATE_USER_FULLNAME_REGEX.test(fullName)) {
+        return "Họ tên chỉ gồm chữ cái và khoảng trắng hợp lệ, độ dài 2-100 ký tự";
+      }
+      return "";
+    }
+
+    if (fieldName === "role") {
+      if (!role) return "Vai trò không hợp lệ";
+      return "";
+    }
+
+    return "";
+  };
+
+  const getCreateUserFieldErrors = (
+    data: typeof createData = createData,
+  ): CreateUserFieldErrors => {
+    const fields: CreateUserFieldName[] = [
+      "username",
+      "email",
+      "password",
+      "fullName",
+      "role",
+    ];
+
+    return fields.reduce<CreateUserFieldErrors>((acc, fieldName) => {
+      const message = getCreateUserFieldError(fieldName, data);
+      if (message) {
+        acc[fieldName] = message;
+      }
+      return acc;
+    }, {});
+  };
+
+  const validateCreateUserData = () => {
+    const nextErrors = getCreateUserFieldErrors();
+    setCreateFieldErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleCreateFieldChange = (
+    fieldName: CreateUserFieldName,
+    value: string,
+  ) => {
+    setCreateData((prev) => ({ ...prev, [fieldName]: value }));
+
+    if (!createTouchedFields[fieldName] && !createHasSubmitted) {
+      return;
+    }
+
+    const nextData = { ...createData, [fieldName]: value };
+
+    if (createHasSubmitted) {
+      setCreateFieldErrors(getCreateUserFieldErrors(nextData));
+      return;
+    }
+
+    setCreateFieldErrors((prev) => ({
+      ...prev,
+      [fieldName]: getCreateUserFieldError(fieldName, nextData),
+    }));
+  };
+
+  const handleCreateFieldBlur = (fieldName: CreateUserFieldName) => {
+    setCreateTouchedFields((prev) => ({ ...prev, [fieldName]: true }));
+    setCreateFieldErrors((prev) => ({
+      ...prev,
+      [fieldName]: getCreateUserFieldError(fieldName),
+    }));
   };
 
   const applyLocalFiltersAndPagination = useCallback(
@@ -219,6 +444,42 @@ export default function UsersTab() {
     setSelectedUser(null);
   };
 
+  const handleCreateUser = async () => {
+    setCreateHasSubmitted(true);
+    setCreateTouchedFields({
+      username: true,
+      email: true,
+      password: true,
+      fullName: true,
+      role: true,
+    });
+
+    const isValid = validateCreateUserData();
+    if (!isValid) {
+      return;
+    }
+
+    setCreatingUser(true);
+    setCreateError(null);
+
+    const response = await adminService.createUser({
+      username: createData.username.trim(),
+      password: createData.password,
+      email: createData.email.trim().toLowerCase(),
+      fullName: createData.fullName.trim() || undefined,
+      role: normalizeRoleForApi(createData.role),
+    });
+
+    if (!response.success) {
+      setCreateError(mapCreateUserErrorMessage(response.error));
+      setCreatingUser(false);
+      return;
+    }
+
+    await loadUsers(1, { forceReload: true });
+    closeCreateModal();
+  };
+
   const handleChangeRole = async (userId: number, newRole: string) => {
     const response = await adminService.updateUserRole(
       userId,
@@ -270,6 +531,12 @@ export default function UsersTab() {
             <option value="Admin">Admin</option>
             <option value="User">User</option>
           </select>
+          <button
+            onClick={openCreateModal}
+            className="px-5 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium"
+          >
+            Tạo user mới
+          </button>
           <button
             onClick={() => loadUsers(1, { forceReload: true })}
             className="px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
@@ -464,6 +731,154 @@ export default function UsersTab() {
           setDeleteUserId(null);
         }}
       />
+
+      {/* Create User Modal */}
+      {createModalOpen && (
+        <div className="fixed inset-0 z-9999 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={closeCreateModal}
+          />
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100">
+              <h3 className="text-base font-serif font-bold text-slate-800">
+                Tạo người dùng mới
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Tạo tài khoản trực tiếp từ trang quản trị
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-1.5">
+                  Tên đăng nhập
+                </label>
+                <input
+                  type="text"
+                  value={createData.username}
+                  onChange={(e) =>
+                    handleCreateFieldChange("username", e.target.value)
+                  }
+                  onBlur={() => handleCreateFieldBlur("username")}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 focus:border-slate-300 text-sm"
+                />
+                {createFieldErrors.username && (
+                  <p className="mt-1.5 text-xs text-red-600">
+                    {createFieldErrors.username}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-1.5">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={createData.email}
+                  onChange={(e) =>
+                    handleCreateFieldChange("email", e.target.value)
+                  }
+                  onBlur={() => handleCreateFieldBlur("email")}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 focus:border-slate-300 text-sm"
+                />
+                {createFieldErrors.email && (
+                  <p className="mt-1.5 text-xs text-red-600">
+                    {createFieldErrors.email}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-1.5">
+                  Mật khẩu
+                </label>
+                <input
+                  type="password"
+                  value={createData.password}
+                  onChange={(e) =>
+                    handleCreateFieldChange("password", e.target.value)
+                  }
+                  onBlur={() => handleCreateFieldBlur("password")}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 focus:border-slate-300 text-sm"
+                />
+                {createFieldErrors.password && (
+                  <p className="mt-1.5 text-xs text-red-600">
+                    {createFieldErrors.password}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-1.5">
+                    Họ tên
+                  </label>
+                  <input
+                    type="text"
+                    value={createData.fullName}
+                    onChange={(e) =>
+                      handleCreateFieldChange("fullName", e.target.value)
+                    }
+                    onBlur={() => handleCreateFieldBlur("fullName")}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 focus:border-slate-300 text-sm"
+                  />
+                  {createFieldErrors.fullName && (
+                    <p className="mt-1.5 text-xs text-red-600">
+                      {createFieldErrors.fullName}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-1.5">
+                    Vai trò
+                  </label>
+                  <select
+                    value={createData.role}
+                    onChange={(e) =>
+                      handleCreateFieldChange("role", e.target.value)
+                    }
+                    onBlur={() => handleCreateFieldBlur("role")}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 focus:border-slate-300 text-sm"
+                  >
+                    <option value="User">User</option>
+                    <option value="Admin">Admin</option>
+                  </select>
+                  {createFieldErrors.role && (
+                    <p className="mt-1.5 text-xs text-red-600">
+                      {createFieldErrors.role}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {createError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  {createError}
+                </p>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+              <button
+                onClick={closeCreateModal}
+                disabled={creatingUser}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleCreateUser}
+                disabled={creatingUser}
+                className="flex-1 px-4 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                {creatingUser ? "Đang tạo..." : "Tạo người dùng"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit User Modal */}
       {editModalOpen && selectedUser && (

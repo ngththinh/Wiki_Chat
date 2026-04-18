@@ -34,6 +34,7 @@ export const ROUTES = {
   TERMS: "/terms",
   PRIVACY: "/privacy",
   FORGOT_PASSWORD: "/forgot-password",
+  CHANGE_PASSWORD: "/change-password",
   ADMIN: "/admin",
   ADMIN_DOCUMENTS: "/admin/documents",
 } as const;

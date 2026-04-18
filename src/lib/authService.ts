@@ -67,6 +67,12 @@ export interface SetNewPasswordDto {
   confirmPassword: string;
 }
 
+export interface ChangePasswordDto {
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 // Legacy interfaces for backwards compatibility
 export interface LoginResponse extends LoginResponseDto {}
 export interface RegisterResponse extends LoginResponseDto {}
@@ -137,6 +143,99 @@ const safeParseJson = async (response: Response) => {
   }
 };
 
+const mapLoginErrorMessage = (errorMessage?: string | null): string => {
+  const rawMessage = (errorMessage || '').trim();
+  if (!rawMessage) return 'Đăng nhập thất bại. Vui lòng thử lại.';
+
+  const message = rawMessage.toLowerCase();
+
+  if (message.includes('transient failure')) {
+    return 'Hệ thống đang tạm thời gián đoạn. Vui lòng thử lại sau ít phút.';
+  }
+
+  if (
+    message.includes('invalid username') ||
+    message.includes('invalid password') ||
+    message.includes('invalid credentials') ||
+    message.includes('wrong password')
+  ) {
+    return 'Tên đăng nhập hoặc mật khẩu không đúng.';
+  }
+
+  if (message.includes('unauthorized') || message.includes('forbidden')) {
+    return 'Bạn không có quyền truy cập. Vui lòng kiểm tra lại tài khoản.';
+  }
+
+  if (message.includes('locked') || message.includes('lockout')) {
+    return 'Tài khoản đang tạm khóa. Vui lòng thử lại sau.';
+  }
+
+  if (message.includes('timeout')) {
+    return 'Yêu cầu đăng nhập quá thời gian. Vui lòng thử lại.';
+  }
+
+  if (message.includes('http 400')) {
+    return 'Dữ liệu đăng nhập không hợp lệ (HTTP 400).';
+  }
+
+  if (message.includes('http 401')) {
+    return 'Tên đăng nhập hoặc mật khẩu không đúng (HTTP 401).';
+  }
+
+  if (message.includes('http 403')) {
+    return 'Bạn không có quyền truy cập (HTTP 403).';
+  }
+
+  if (message.includes('http 500')) {
+    return 'Máy chủ đang gặp lỗi. Vui lòng thử lại sau.';
+  }
+
+  return 'Đăng nhập thất bại. Vui lòng thử lại.';
+};
+
+const mapChangePasswordErrorMessage = (errorMessage?: string | null): string => {
+  const rawMessage = (errorMessage || '').trim();
+  if (!rawMessage) {
+    return 'Không thể đổi mật khẩu. Vui lòng thử lại.';
+  }
+
+  const message = rawMessage.toLowerCase();
+
+  if (message.includes('old password') && message.includes('incorrect')) {
+    return 'Mật khẩu hiện tại không đúng.';
+  }
+
+  if (message.includes('password') && message.includes('mismatch')) {
+    return 'Mật khẩu xác nhận không khớp.';
+  }
+
+  if (message.includes('same as old') || message.includes('must be different')) {
+    return 'Mật khẩu mới phải khác mật khẩu hiện tại.';
+  }
+
+  if (message.includes('transient failure')) {
+    return 'Hệ thống đang tạm thời gián đoạn. Vui lòng thử lại sau ít phút.';
+  }
+
+  if (message.includes('unauthorized') || message.includes('forbidden')) {
+    return 'Phiên đăng nhập không hợp lệ hoặc bạn không có quyền thực hiện.';
+  }
+
+  if (message.includes('http 400')) {
+    return 'Dữ liệu đổi mật khẩu không hợp lệ (HTTP 400).';
+  }
+
+  if (message.includes('http 401')) {
+    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+  }
+
+  if (message.includes('http 500')) {
+    return 'Máy chủ đang gặp lỗi. Vui lòng thử lại sau.';
+  }
+
+  return 'Đổi mật khẩu thất bại. Vui lòng thử lại.';
+};
+
 // Auth Service
 export const authService = {
   // Login với username và password
@@ -152,7 +251,7 @@ export const authService = {
         body: JSON.stringify({ usernameOrEmail: username, password } as LoginDto),
       });
 
-      const data = await response.json();
+      const data = await safeParseJson(response);
       console.log("🔐 Login response status:", response.status);
       console.log("🔐 Login response data:", data);
 
@@ -160,7 +259,9 @@ export const authService = {
         console.error("❌ Login failed:", data);
         return {
           success: false,
-          error: data.message || data.detail || 'Đăng nhập thất bại',
+          error: mapLoginErrorMessage(
+            data?.message || data?.detail || `Đăng nhập thất bại (HTTP ${response.status})`,
+          ),
         };
       }
 
@@ -384,6 +485,74 @@ export const authService = {
         data: data || { message: 'Password reset successful' },
       };
     } catch (error) {
+      return {
+        success: false,
+        error: 'Lỗi kết nối. Vui lòng kiểm tra mạng.',
+      };
+    }
+  },
+
+  async changePassword(
+    oldPassword: string,
+    newPassword: string,
+    confirmPassword: string,
+  ): Promise<ApiResponse<string | Record<string, unknown>>> {
+    try {
+      const token = getValidAuthToken();
+      if (!token) {
+        return {
+          success: false,
+          error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          oldPassword,
+          newPassword,
+          confirmPassword,
+        } as ChangePasswordDto),
+      });
+
+      const rawText = await response.text();
+      let parsedData: unknown = null;
+      if (rawText) {
+        try {
+          parsedData = JSON.parse(rawText);
+        } catch {
+          parsedData = rawText;
+        }
+      }
+
+      if (!response.ok) {
+        const message =
+          typeof parsedData === 'object' && parsedData !== null
+            ? ((parsedData as { message?: string; detail?: string }).message ||
+              (parsedData as { message?: string; detail?: string }).detail)
+            : typeof parsedData === 'string'
+              ? parsedData
+              : `Đổi mật khẩu thất bại (HTTP ${response.status})`;
+
+        return {
+          success: false,
+          error: mapChangePasswordErrorMessage(message),
+        };
+      }
+
+      return {
+        success: true,
+        data:
+          (typeof parsedData === 'string' ||
+            (typeof parsedData === 'object' && parsedData !== null))
+            ? (parsedData as string | Record<string, unknown>)
+            : 'Đổi mật khẩu thành công',
+      };
+    } catch {
       return {
         success: false,
         error: 'Lỗi kết nối. Vui lòng kiểm tra mạng.',

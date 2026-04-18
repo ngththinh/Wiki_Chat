@@ -235,6 +235,26 @@ export default function AdminSidebar({
                   </svg>
                   Trò chuyện
                 </Link>
+                <Link
+                  href={ROUTES.CHANGE_PASSWORD}
+                  onClick={() => setIsAccountMenuOpen(false)}
+                  className="w-full px-4 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-800 flex items-center gap-3 transition-colors rounded-md"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6A2.25 2.25 0 0117.25 21h-10.5A2.25 2.25 0 014.5 18.75v-6A2.25 2.25 0 016.75 10.5z"
+                    />
+                  </svg>
+                  Đổi mật khẩu
+                </Link>
                 <button
                   onClick={handleOpenLogout}
                   className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-3 transition-colors rounded-md"
@@ -439,6 +459,26 @@ export default function AdminSidebar({
                     />
                   </svg>
                   Trò chuyện
+                </Link>
+                <Link
+                  href={ROUTES.CHANGE_PASSWORD}
+                  onClick={() => setIsAccountMenuOpen(false)}
+                  className="w-full px-4 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-800 flex items-center gap-3 transition-colors rounded-md"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6A2.25 2.25 0 0117.25 21h-10.5A2.25 2.25 0 014.5 18.75v-6A2.25 2.25 0 016.75 10.5z"
+                    />
+                  </svg>
+                  Đổi mật khẩu
                 </Link>
                 <button
                   onClick={handleOpenLogout}

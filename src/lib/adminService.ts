@@ -231,6 +231,15 @@ export interface UpdateUserRoleDto {
   role: string;
 }
 
+export interface CreateAdminUserDto {
+  username: string;
+  password: string;
+  email: string;
+  fullName?: string;
+  avatarUrl?: string;
+  role?: string;
+}
+
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -482,6 +491,35 @@ export const adminService = {
       if (!response.ok) {
         const data = await safeJsonParse(response);
         return { success: false, error: data?.message || data?.detail || `Lỗi lấy thông tin người dùng (HTTP ${response.status})` };
+      }
+
+      const data = await safeJsonParse(response);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Create user (new endpoint)
+  async createUser(
+    payload: CreateAdminUserDto,
+  ): Promise<ApiResponse<AdminUserDto | number | string | null>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/user`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi tạo người dùng (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
