@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { InputField } from "@/components/common";
@@ -94,6 +94,7 @@ function getFieldError(
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
+  type RouteValue = (typeof ROUTES)[keyof typeof ROUTES];
   const [formData, setFormData] = useState<ChangePasswordFormData>({
     oldPassword: "",
     newPassword: "",
@@ -102,23 +103,25 @@ export default function ChangePasswordScreen() {
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [redirectTarget, setRedirectTarget] = useState(ROUTES.CHAT);
+  const [redirectTarget, setRedirectTarget] = useState<RouteValue>(ROUTES.CHAT);
   const [touchedFields, setTouchedFields] = useState<
     Partial<Record<PasswordFieldName, boolean>>
   >({});
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
-  const currentUser = useMemo(() => authService.getCurrentUser(), []);
-
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const user = authService.getCurrentUser();
+
     if (!authService.isAuthenticated()) {
       router.replace(ROUTES.LOGIN);
       return;
     }
 
-    const isAdmin = currentUser?.role?.toLowerCase() === "admin";
+    const isAdmin = user?.role?.toLowerCase() === "admin";
     setRedirectTarget(isAdmin ? ROUTES.ADMIN : ROUTES.CHAT);
-  }, [currentUser, router]);
+  }, [router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
