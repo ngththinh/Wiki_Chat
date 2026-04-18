@@ -5,28 +5,46 @@ type StaticCategory = {
   id?: string;
 };
 
+const FALLBACK_CATEGORY_IDS = [
+  "ce83b2a6-1973-4e9b-a539-cddb4dd2ebd6",
+  "7bfe0e54-8df0-4f95-a4a7-ed34c30ccc59",
+  "1b1ee0e1-481a-49f9-bcea-c0d2333c77f8",
+  "d1583dc0-1c6b-4084-86ef-0fa9cce5f47c",
+  "e38163d9-257e-49ea-8dab-0c0dff7ceec2",
+];
+
+const mapCategoryParams = (ids: string[]) =>
+  ids
+    .map((id) => id.trim())
+    .filter((id) => Boolean(id))
+    .map((categoryId) => ({ categoryId }));
+
 export async function generateStaticParams() {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (!apiBaseUrl) return [];
+  if (!apiBaseUrl) return mapCategoryParams(FALLBACK_CATEGORY_IDS);
 
   try {
     const response = await fetch(`${apiBaseUrl}/Category`, {
       method: "GET",
       headers: { Accept: "application/json" },
-      cache: "no-store",
+      cache: "force-cache",
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) return mapCategoryParams(FALLBACK_CATEGORY_IDS);
 
     const data = (await response.json()) as StaticCategory[];
-    if (!Array.isArray(data)) return [];
+    if (!Array.isArray(data)) return mapCategoryParams(FALLBACK_CATEGORY_IDS);
 
-    return data
+    const params = data
       .map((item) => item.id?.trim())
       .filter((id): id is string => Boolean(id))
       .map((categoryId) => ({ categoryId }));
+
+    return params.length > 0
+      ? params
+      : mapCategoryParams(FALLBACK_CATEGORY_IDS);
   } catch {
-    return [];
+    return mapCategoryParams(FALLBACK_CATEGORY_IDS);
   }
 }
 
