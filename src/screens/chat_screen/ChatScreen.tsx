@@ -192,18 +192,6 @@ export default function ChatScreen() {
 
           setIsPendingConversation(false);
         }
-
-        if (!isGuest && historySessionId) {
-          const saveResult = await historyService.createMessage(
-            historySessionId,
-            message,
-            response.data.answer,
-            responseModel,
-          );
-          if (saveResult.success) {
-            setSidebarRefreshTrigger((prev) => prev + 1);
-          }
-        }
       } else {
         const errorText = response.error || "Không thể kết nối đến server";
         const errorMessage = createMessage(
@@ -217,15 +205,6 @@ export default function ChatScreen() {
           setIsPendingConversation(false);
           setCurrentChat(null);
           persistActiveSession(null);
-        }
-
-        if (!isGuest && historySessionId) {
-          await historyService.createMessage(
-            historySessionId,
-            message,
-            `[Error] ${errorText}`,
-            model,
-          );
         }
       }
     } catch (error) {
