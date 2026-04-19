@@ -503,7 +503,7 @@ export default function ChatSidebarNav({
               Trò chuyện mới
             </button>
 
-            <button className="w-11 h-11 border border-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-100 hover:text-slate-700 transition-colors rounded-lg">
+            {/* <button className="w-11 h-11 border border-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-100 hover:text-slate-700 transition-colors rounded-lg">
               <svg
                 className="w-4 h-4"
                 fill="none"
@@ -517,7 +517,7 @@ export default function ChatSidebarNav({
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
-            </button>
+            </button> */}
           </div>
         </div>
 

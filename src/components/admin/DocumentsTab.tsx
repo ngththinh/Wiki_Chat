@@ -53,7 +53,6 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     categoryId: "",
     title: "",
     content: "",
-    wikipediaUrl: "",
   });
 
   // Edit forms
@@ -64,7 +63,6 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
   const [editDetailData, setEditDetailData] = useState<UpdateDetailDto>({
     title: "",
     content: "",
-    wikipediaUrl: "",
   });
 
   const normalizeFormValue = (value?: string | null) => (value || "").trim();
@@ -152,9 +150,7 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       normalizeFormValue(editDetailData.title) !==
         normalizeFormValue(editingDetail.title) ||
       normalizeFormValue(editDetailData.content) !==
-        normalizeFormValue(editingDetail.content) ||
-      normalizeFormValue(editDetailData.wikipediaUrl) !==
-        normalizeFormValue(editingDetail.wikipediaUrl)
+        normalizeFormValue(editingDetail.content)
     );
   }, [editingDetail, editDetailData]);
 
@@ -824,7 +820,6 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     setEditDetailData({
       title: detail.title || "",
       content: detail.content || "",
-      wikipediaUrl: detail.wikipediaUrl || "",
     });
     setEditDetailModalOpen(true);
   };
@@ -1064,8 +1059,7 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
               Chức năng: thêm danh nhân theo danh mục, chỉnh sửa nội dung và xóa
               bản ghi không còn sử dụng.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <select
+            <select
                 value={newDetail.categoryId}
                 onChange={(e) =>
                   setNewDetail((prev) => ({
@@ -1073,7 +1067,7 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                     categoryId: e.target.value,
                   }))
                 }
-                className="px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+                className="w-full px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
               >
                 <option value="">Chọn danh mục</option>
                 {categories.map((category) => (
@@ -1082,6 +1076,19 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                   </option>
                 ))}
               </select>
+          </div>
+          <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-5 h-px bg-slate-300" />
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                Cập nhật danh nhân
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Chức năng: thêm danh nhân theo danh mục, chỉnh sửa nội dung và xóa
+              bản ghi không còn sử dụng.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <input
                 type="text"
                 value={newDetail.title}
@@ -1089,31 +1096,37 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                   setNewDetail((prev) => ({ ...prev, title: e.target.value }))
                 }
                 placeholder="Tiêu đề danh nhân"
-                className="px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-              />
-              <input
-                type="text"
-                value={newDetail.wikipediaUrl || ""}
-                onChange={(e) =>
-                  setNewDetail((prev) => ({
-                    ...prev,
-                    wikipediaUrl: e.target.value,
-                  }))
-                }
-                placeholder="Wikipedia URL (tùy chọn)"
-                className="md:col-span-2 px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+                className="w-full px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
               />
               <button
                 onClick={handleCreateDetail}
                 disabled={submitting || wikiLoadingTarget === "create"}
-                className="md:col-span-2 px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors text-sm font-medium"
+                className="w-full px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors text-sm font-medium"
               >
                 {wikiLoadingTarget === "create"
-                  ? "Đang cập nhật từ Wikipedia..."
-                  : "Cập nhật"}
+                  ? "Đang cập nhật..."
+                  : "Cập nhật danh nhân"}
               </button>
             </div>
           </div>
+
+                        {/* <select
+                value={newDetail.categoryId}
+                onChange={(e) =>
+                  setNewDetail((prev) => ({
+                    ...prev,
+                    categoryId: e.target.value,
+                  }))
+                }
+                className="w-full px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
+              >
+                <option value="">Chọn danh mục</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select> */}
 
           {/* Detail list */}
           <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl overflow-hidden">

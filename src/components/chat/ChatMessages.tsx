@@ -231,7 +231,7 @@ function MessageBubble({ message }: { message: Message }) {
         }`}
       >
         <p
-          className={`text-sm leading-relaxed ${
+          className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${
             isUser ? "text-white/90" : "text-slate-700"
           }`}
         >
