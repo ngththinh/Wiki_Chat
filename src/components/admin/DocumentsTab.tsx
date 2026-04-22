@@ -15,6 +15,41 @@ interface DocumentsTabProps {
   mode?: "all" | "categories" | "details";
 }
 
+type CreatePipelineStep =
+  | "queued"
+  | "jobs"
+  | "polling"
+  | "saving"
+  | "completed";
+
+interface CreatePipelineProgress {
+  visible: boolean;
+  step: CreatePipelineStep;
+  status: "running" | "success" | "error";
+  note: string;
+  error?: string;
+}
+
+const CREATE_PIPELINE_STEPS: Array<{ id: CreatePipelineStep; label: string }> =
+  [
+    { id: "queued", label: "Gửi yêu cầu lấy dữ liệu từ Wikipedia" },
+    { id: "jobs", label: "Khởi tạo job chunking và GraphRAG" },
+    { id: "polling", label: "Theo dõi trạng thái xử lý pipeline" },
+    { id: "saving", label: "Lưu dữ liệu danh nhân" },
+    { id: "completed", label: "Hoàn tất cập nhật" },
+  ];
+
+const PIPELINE_POLL_INTERVAL_MS = 1500;
+const PIPELINE_MAX_WAIT_MS = 8 * 60 * 1000;
+
+interface PipelineWaitResult {
+  success: boolean;
+  graphCompleted: boolean;
+  chunkCompleted: boolean;
+  warning?: string;
+  error?: string;
+}
+
 export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [details, setDetails] = useState<DetailDto[]>([]);
@@ -28,6 +63,13 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [createPipelineProgress, setCreatePipelineProgress] =
+    useState<CreatePipelineProgress>({
+      visible: false,
+      step: "queued",
+      status: "running",
+      note: "",
+    });
 
   // Delete modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -160,6 +202,54 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
 
   const showError = (text: string) => setMessage({ type: "error", text });
   const showSuccess = (text: string) => setMessage({ type: "success", text });
+
+  const startCreatePipelineProgress = (note: string) => {
+    setCreatePipelineProgress({
+      visible: true,
+      step: "queued",
+      status: "running",
+      note,
+      error: undefined,
+    });
+  };
+
+  const updateCreatePipelineProgress = (
+    step: CreatePipelineStep,
+    note: string,
+  ) => {
+    setCreatePipelineProgress((prev) => ({
+      ...prev,
+      visible: true,
+      step,
+      note,
+      status: "running",
+      error: undefined,
+    }));
+  };
+
+  const failCreatePipelineProgress = (
+    error: string,
+    step: CreatePipelineStep = "polling",
+  ) => {
+    setCreatePipelineProgress((prev) => ({
+      ...prev,
+      visible: true,
+      step,
+      status: "error",
+      error,
+      note: "Pipeline dừng do lỗi.",
+    }));
+  };
+
+  const completeCreatePipelineProgress = (note: string) => {
+    setCreatePipelineProgress({
+      visible: true,
+      step: "completed",
+      status: "success",
+      note,
+      error: undefined,
+    });
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -379,79 +469,103 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     });
 
   const waitForPipelineSuccess = async (
-    graphJobId: string,
-    chunkJobId: string,
-  ) => {
-    const maxAttempts = 40;
+    graphJobId?: string,
+    chunkJobId?: string,
+  ): Promise<PipelineWaitResult> => {
+    const maxAttempts = Math.ceil(
+      PIPELINE_MAX_WAIT_MS / PIPELINE_POLL_INTERVAL_MS,
+    );
+
+    let graphCompleted = false;
+    let chunkCompleted = false;
+    let graphFailedReason = graphJobId ? "" : "Không có graphJobId.";
+    let chunkFailedReason = chunkJobId ? "" : "Không có chunkJobId.";
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      const graphStatusRes =
-        await adminService.getGraphRagNodeStatus(graphJobId);
-      const chunkStatusRes = chunkJobId
-        ? await adminService.getWikipediaChunkStatus(chunkJobId)
-        : { success: false, error: "Chunk jobId chưa sẵn sàng." };
+      if (graphJobId && !graphCompleted && !graphFailedReason) {
+        const graphStatusRes =
+          await adminService.getGraphRagNodeStatus(graphJobId);
 
-      if (!graphStatusRes.success) {
-        if (
-          isRetryableStatusError(graphStatusRes.error) &&
-          attempt < maxAttempts
-        ) {
-          await sleep(1500);
-          continue;
+        if (graphStatusRes.success) {
+          const graphStatus = getStatusText(graphStatusRes.data);
+          if (isDoneStatus(graphStatus)) {
+            graphCompleted = true;
+          } else if (isFailedStatus(graphStatus)) {
+            graphFailedReason = "Tạo node GraphRAG thất bại.";
+          }
+        } else if (!isRetryableStatusError(graphStatusRes.error)) {
+          graphFailedReason =
+            graphStatusRes.error || "Không lấy được trạng thái GraphRAG.";
         }
-
-        return {
-          success: false,
-          error: graphStatusRes.error || "Không lấy được trạng thái GraphRAG.",
-        };
       }
 
-      if (!chunkStatusRes.success) {
-        if (
-          isRetryableStatusError(chunkStatusRes.error) &&
-          attempt < maxAttempts
-        ) {
-          await sleep(1500);
-          continue;
+      if (chunkJobId && !chunkCompleted && !chunkFailedReason) {
+        const chunkStatusRes =
+          await adminService.getWikipediaChunkStatus(chunkJobId);
+
+        if (chunkStatusRes.success) {
+          const chunkStatus = getStatusText(chunkStatusRes.data);
+          if (isDoneStatus(chunkStatus)) {
+            chunkCompleted = true;
+          } else if (isFailedStatus(chunkStatus)) {
+            chunkFailedReason = "Tách chunk cho RAG thất bại.";
+          }
+        } else if (!isRetryableStatusError(chunkStatusRes.error)) {
+          chunkFailedReason =
+            chunkStatusRes.error || "Không lấy được trạng thái chunking.";
         }
-
-        return {
-          success: false,
-          error: chunkStatusRes.error || "Không lấy được trạng thái chunking.",
-        };
       }
 
-      const chunkStatusPayload: unknown = chunkStatusRes.data;
+      const graphSettled = graphCompleted || Boolean(graphFailedReason);
+      const chunkSettled = chunkCompleted || Boolean(chunkFailedReason);
 
-      const graphStatus = getStatusText(graphStatusRes.data);
-      const chunkStatus = getStatusText(chunkStatusPayload);
-
-      if (isFailedStatus(graphStatus)) {
-        return {
-          success: false,
-          error: "Tạo node GraphRAG thất bại.",
-        };
-      }
-
-      if (isFailedStatus(chunkStatus)) {
-        return {
-          success: false,
-          error: "Tách chunk cho RAG thất bại.",
-        };
-      }
-
-      if (isDoneStatus(graphStatus) && isDoneStatus(chunkStatus)) {
-        return { success: true };
+      if (graphSettled && chunkSettled) {
+        break;
       }
 
       if (attempt < maxAttempts) {
-        await sleep(1500);
+        await sleep(PIPELINE_POLL_INTERVAL_MS);
       }
     }
 
+    if (!graphCompleted && !graphFailedReason && graphJobId) {
+      graphFailedReason = "GraphRAG quá thời gian chờ (8 phút).";
+    }
+
+    if (!chunkCompleted && !chunkFailedReason && chunkJobId) {
+      chunkFailedReason = "Chunking quá thời gian chờ (8 phút).";
+    }
+
+    const warnings = [
+      graphCompleted
+        ? ""
+        : graphFailedReason
+          ? `GraphRAG: ${graphFailedReason}`
+          : "",
+      chunkCompleted
+        ? ""
+        : chunkFailedReason
+          ? `Chunking: ${chunkFailedReason}`
+          : "",
+    ].filter(Boolean);
+
+    const canProceed = graphCompleted || chunkCompleted;
+
+    if (!canProceed) {
+      return {
+        success: false,
+        graphCompleted,
+        chunkCompleted,
+        error:
+          warnings.join(" | ") || "Cả GraphRAG và chunking đều không hoàn tất.",
+      };
+    }
+
     return {
-      success: false,
-      error: "Quá thời gian chờ xử lý pipeline (GraphRAG + chunking).",
+      success: true,
+      graphCompleted,
+      chunkCompleted,
+      warning: warnings.length ? warnings.join(" | ") : undefined,
     };
   };
 
@@ -524,6 +638,9 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
 
     setSubmitting(true);
     setWikiLoadingTarget("create");
+    startCreatePipelineProgress(
+      "Đang gửi yêu cầu tới Wikipedia và dịch vụ xử lý.",
+    );
 
     const [graphResult, ragResult] = await Promise.allSettled([
       adminService.fetchWikipediaContentForDetail({
@@ -582,21 +699,28 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     const canContinueGraph = isGraphSuccess || Boolean(graphJobIdFromError);
     const canContinueRag = isRagSuccess || Boolean(chunkJobIdFromError);
 
-    if (!canContinueGraph || !canContinueRag) {
+    updateCreatePipelineProgress(
+      "jobs",
+      "Đã nhận phản hồi ban đầu, đang kiểm tra thông tin job.",
+    );
+
+    if (!canContinueGraph && !canContinueRag) {
       const timeoutHint =
         canContinueGraph && !canContinueRag && isTimeoutError(ragError)
           ? "GraphRAG da queue thanh cong, nhung chunking dang timeout o BE (HttpClient 120s)."
           : "";
 
-      showError(
+      const finalError =
         [
           timeoutHint,
           graphError ? `GraphRAG: ${graphError}` : "",
           ragError ? `Chunking: ${ragError}` : "",
         ]
           .filter(Boolean)
-          .join(" | ") || "Không thể lấy dữ liệu từ Wikipedia.",
-      );
+          .join(" | ") || "Không thể lấy dữ liệu từ Wikipedia.";
+
+      failCreatePipelineProgress(finalError, "jobs");
+      showError(finalError);
       setSubmitting(false);
       setWikiLoadingTarget(null);
       clearMessageSoon();
@@ -608,7 +732,11 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     const chunkJobId =
       extractChunkJobId(ragResponse?.data) || chunkJobIdFromError;
 
-    if (!graphJobId || !chunkJobId) {
+    if (!graphJobId && !chunkJobId) {
+      failCreatePipelineProgress(
+        "Không lấy được thông tin job để kiểm tra trạng thái pipeline.",
+        "jobs",
+      );
       showError(
         "Không lấy được thông tin job để kiểm tra trạng thái pipeline.",
       );
@@ -618,13 +746,29 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       return;
     }
 
+    updateCreatePipelineProgress(
+      "polling",
+      "Đang đợi GraphRAG và chunking xử lý xong (tối đa 8 phút).",
+    );
+
     const pipelineResult = await waitForPipelineSuccess(graphJobId, chunkJobId);
     if (!pipelineResult.success) {
+      failCreatePipelineProgress(
+        pipelineResult.error || "Pipeline xử lý chưa hoàn tất.",
+        "polling",
+      );
       showError(pipelineResult.error || "Pipeline xử lý chưa hoàn tất.");
       setSubmitting(false);
       setWikiLoadingTarget(null);
       clearMessageSoon();
       return;
+    }
+
+    if (pipelineResult.warning) {
+      updateCreatePipelineProgress(
+        "polling",
+        `Pipeline hoàn tất một phần: ${pipelineResult.warning}`,
+      );
     }
 
     const { extractedTitle, extractedContent, extractedUrl } =
@@ -671,6 +815,11 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       wikipediaUrl: finalWikipediaUrl || undefined,
     };
 
+    updateCreatePipelineProgress(
+      "saving",
+      "Đang lưu dữ liệu danh nhân vào hệ thống.",
+    );
+
     const saveResponse = existingDetail
       ? await adminService.updateAdminDetail(existingDetail.id, payload)
       : await adminService.createAdminDetail({
@@ -679,10 +828,18 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
         });
 
     if (saveResponse.success) {
-      showSuccess(
+      completeCreatePipelineProgress(
         existingDetail
-          ? "Pipeline hoàn tất, đã cập nhật danh nhân theo lĩnh vực đã chọn."
-          : "Pipeline hoàn tất, đã tạo danh nhân theo lĩnh vực đã chọn.",
+          ? "Đã cập nhật danh nhân thành công."
+          : "Đã tạo danh nhân thành công.",
+      );
+      const baseSuccessMessage = existingDetail
+        ? "Pipeline hoàn tất, đã cập nhật danh nhân theo lĩnh vực đã chọn."
+        : "Pipeline hoàn tất, đã tạo danh nhân theo lĩnh vực đã chọn.";
+      showSuccess(
+        pipelineResult.warning
+          ? `${baseSuccessMessage} Lưu ý: ${pipelineResult.warning}`
+          : baseSuccessMessage,
       );
       setNewDetail((prev) => ({
         ...prev,
@@ -692,6 +849,10 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       }));
       await loadData();
     } else {
+      failCreatePipelineProgress(
+        saveResponse.error || "Không thể cập nhật danh nhân.",
+        "saving",
+      );
       showError(saveResponse.error || "Không thể cập nhật danh nhân.");
     }
 
@@ -1112,6 +1273,84 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                   ? "Đang cập nhật từ Wikipedia..."
                   : "Cập nhật"}
               </button>
+
+              {createPipelineProgress.visible && (
+                <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-3.5">
+                  <div className="flex items-center justify-between gap-3 mb-2.5">
+                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                      Tiến trình cập nhật
+                    </p>
+                    <span
+                      className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${
+                        createPipelineProgress.status === "success"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : createPipelineProgress.status === "error"
+                            ? "bg-red-50 text-red-700 border-red-200"
+                            : "bg-white text-slate-600 border-slate-200"
+                      }`}
+                    >
+                      {createPipelineProgress.status === "success"
+                        ? "Hoàn tất"
+                        : createPipelineProgress.status === "error"
+                          ? "Lỗi"
+                          : "Đang xử lý"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {CREATE_PIPELINE_STEPS.map((step, index) => {
+                      const activeIndex = CREATE_PIPELINE_STEPS.findIndex(
+                        (item) => item.id === createPipelineProgress.step,
+                      );
+                      const isDone = index < activeIndex;
+                      const isCurrent = index === activeIndex;
+
+                      return (
+                        <div
+                          key={step.id}
+                          className="flex items-center gap-2.5 text-xs"
+                        >
+                          <span
+                            className={`w-4 h-4 rounded-full border inline-flex items-center justify-center ${
+                              isDone
+                                ? "bg-emerald-100 border-emerald-300 text-emerald-700"
+                                : isCurrent
+                                  ? createPipelineProgress.status === "error"
+                                    ? "bg-red-100 border-red-300 text-red-700"
+                                    : "bg-slate-200 border-slate-300 text-slate-700"
+                                  : "bg-white border-slate-200 text-slate-300"
+                            }`}
+                          >
+                            {isDone ? "✓" : index + 1}
+                          </span>
+                          <span
+                            className={`${
+                              isCurrent
+                                ? createPipelineProgress.status === "error"
+                                  ? "text-red-700"
+                                  : "text-slate-700"
+                                : isDone
+                                  ? "text-slate-600"
+                                  : "text-slate-400"
+                            }`}
+                          >
+                            {step.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-3">
+                    {createPipelineProgress.note}
+                  </p>
+                  {createPipelineProgress.error && (
+                    <p className="text-xs text-red-600 mt-1">
+                      {createPipelineProgress.error}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
