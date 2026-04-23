@@ -36,7 +36,11 @@ export const ROUTES = {
   FORGOT_PASSWORD: "/forgot-password",
   CHANGE_PASSWORD: "/change-password",
   ADMIN: "/admin",
-  ADMIN_DOCUMENTS: "/admin/documents",
+  ADMIN_USERS: "/admin/users",
+  ADMIN_SESSIONS: "/admin/sessions",
+  ADMIN_CATEGORIES: "/admin/categories",
+  ADMIN_DETAILS: "/admin/details",
+  ADMIN_DOCUMENTS: "/admin/categories",
 } as const;
 
 // User roles

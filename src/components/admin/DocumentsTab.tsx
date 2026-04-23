@@ -6,10 +6,16 @@ import adminService, {
   CreateCategoryDto,
   CreateDetailDto,
   DetailDto,
+  DetailDtoPagedResult,
   UpdateCategoryDto,
   UpdateDetailDto,
+  WikipediaSearchResultDto,
 } from "@/lib/adminService";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import DetailPersonCard from "@/components/admin/DetailPersonCard";
+import DetailSearchBar from "@/components/admin/DetailSearchBar";
+import WikipediaSearchResults from "@/components/admin/WikipediaSearchResults";
+import CreateDetailForm from "@/components/admin/CreateDetailForm";
 
 interface DocumentsTabProps {
   mode?: "all" | "categories" | "details";
@@ -30,17 +36,18 @@ interface CreatePipelineProgress {
   error?: string;
 }
 
-const CREATE_PIPELINE_STEPS: Array<{ id: CreatePipelineStep; label: string }> =
-  [
-    { id: "queued", label: "Gửi yêu cầu lấy dữ liệu từ Wikipedia" },
-    { id: "jobs", label: "Khởi tạo job chunking và GraphRAG" },
-    { id: "polling", label: "Theo dõi trạng thái xử lý pipeline" },
-    { id: "saving", label: "Lưu dữ liệu danh nhân" },
-    { id: "completed", label: "Hoàn tất cập nhật" },
-  ];
-
-const PIPELINE_POLL_INTERVAL_MS = 1500;
+const PIPELINE_POLL_INTERVAL_MS = 5000;
 const PIPELINE_MAX_WAIT_MS = 8 * 60 * 1000;
+const PIPELINE_RECOVERY_MAX_ATTEMPTS = 2;
+
+// Module-level cache to avoid redundant API calls during HMR dev reloads
+const _hmrCache: {
+  categories?: CategoryDto[];
+  details?: DetailDtoPagedResult;
+  cacheKey?: string;
+  timestamp?: number;
+} = {};
+const HMR_CACHE_TTL_MS = 15_000; // 15 seconds
 
 interface PipelineWaitResult {
   success: boolean;
@@ -51,14 +58,37 @@ interface PipelineWaitResult {
 }
 
 export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
+  const DEFAULT_DETAIL_PAGE_SIZE = 10;
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [details, setDetails] = useState<DetailDto[]>([]);
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
+  const [detailPageSize, setDetailPageSize] = useState(
+    DEFAULT_DETAIL_PAGE_SIZE,
+  );
+  const [wikiSearchKeyword, setWikiSearchKeyword] = useState("");
+  const [selectedWikiResult, setSelectedWikiResult] =
+    useState<WikipediaSearchResultDto | null>(null);
+  const [wikiSearchResults, setWikiSearchResults] = useState<
+    WikipediaSearchResultDto[]
+  >([]);
+  const [wikiSearching, setWikiSearching] = useState(false);
+  const [detailPaging, setDetailPaging] = useState<DetailDtoPagedResult>({
+    items: [],
+    totalCount: 0,
+    pageNumber: 1,
+    pageSize: DEFAULT_DETAIL_PAGE_SIZE,
+    totalPages: 1,
+    hasPreviousPage: false,
+    hasNextPage: false,
+  });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [wikiLoadingTarget, setWikiLoadingTarget] = useState<
     "create" | "edit" | null
   >(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -114,10 +144,18 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
   const showCategoryManagement = mode !== "details";
   const showDetailManagement = mode !== "categories";
 
-  const filteredDetails = useMemo(() => {
-    if (selectedCategoryId === "all") return details;
-    return details.filter((detail) => detail.categoryId === selectedCategoryId);
-  }, [details, selectedCategoryId]);
+  const filteredDetails = useMemo(() => details, [details]);
+
+  const pagingDisplayText = useMemo(() => {
+    const total = detailPaging.totalCount || 0;
+    if (total === 0 || filteredDetails.length === 0) {
+      return "Hiển thị 0-0 trên tổng 0";
+    }
+
+    const start = (detailPaging.pageNumber - 1) * detailPaging.pageSize + 1;
+    const end = Math.min(start + filteredDetails.length - 1, total);
+    return `Hiển thị ${start}-${end} trên tổng ${total}`;
+  }, [detailPaging, filteredDetails.length]);
 
   const normalizeLookupValue = (value?: string | null) =>
     (value || "").trim().toLowerCase();
@@ -251,45 +289,86 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     });
   };
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    const [categoriesRes, detailsRes] = await Promise.all([
-      adminService.getAdminCategories(),
-      adminService.getAdminDetails(),
-    ]);
+  const loadData = useCallback(
+    async (forceRefresh = false) => {
+      const cacheKey = `${currentPage}|${detailPageSize}|${selectedCategoryId ?? ""}|${appliedSearchTerm ?? ""}`;
+      const now = Date.now();
+      const cacheHit =
+        !forceRefresh &&
+        _hmrCache.cacheKey === cacheKey &&
+        _hmrCache.timestamp !== undefined &&
+        now - _hmrCache.timestamp < HMR_CACHE_TTL_MS &&
+        _hmrCache.categories !== undefined &&
+        _hmrCache.details !== undefined;
 
-    if (categoriesRes.success && categoriesRes.data) {
-      const categoryData = categoriesRes.data;
-      setCategories(categoryData);
-      if (categoryData.length > 0) {
-        setNewDetail((prev) => {
-          if (prev.categoryId) return prev;
-          return { ...prev, categoryId: categoryData[0].id };
-        });
+      if (cacheHit) {
+        setCategories(_hmrCache.categories!);
+        setDetails(_hmrCache.details!.items);
+        setDetailPaging(_hmrCache.details!);
+        return;
       }
-    } else if (categoriesRes.error) {
-      setMessage({ type: "error", text: categoriesRes.error });
-    }
 
-    if (detailsRes.success && detailsRes.data) {
-      setDetails(detailsRes.data);
-    } else if (detailsRes.error) {
-      setMessage({ type: "error", text: detailsRes.error });
-    }
+      setLoading(true);
+      const [categoriesRes, detailsRes] = await Promise.all([
+        adminService.getAdminCategories(),
+        adminService.getAdminDetails({
+          pageNumber: currentPage,
+          pageSize: detailPageSize,
+          categoryId: selectedCategoryId,
+          searchTerm: appliedSearchTerm || undefined,
+          sortBy: "CreatedAt",
+          sortDescending: true,
+        }),
+      ]);
 
-    setLoading(false);
-  }, []);
+      if (categoriesRes.success && categoriesRes.data) {
+        const categoryData = categoriesRes.data;
+        setCategories(categoryData);
+        if (categoryData.length > 0) {
+          setNewDetail((prev) => {
+            if (prev.categoryId) return prev;
+            return { ...prev, categoryId: categoryData[0].id };
+          });
+        }
+      } else if (categoriesRes.error) {
+        setMessage({ type: "error", text: categoriesRes.error });
+      }
+
+      if (detailsRes.success && detailsRes.data) {
+        setDetails(detailsRes.data.items);
+        setDetailPaging(detailsRes.data);
+
+        // Update HMR cache
+        _hmrCache.categories = categoriesRes.data ?? undefined;
+        _hmrCache.details = detailsRes.data;
+        _hmrCache.cacheKey = cacheKey;
+        _hmrCache.timestamp = Date.now();
+      } else if (detailsRes.error) {
+        setMessage({ type: "error", text: detailsRes.error });
+      }
+
+      setLoading(false);
+    },
+    [appliedSearchTerm, currentPage, detailPageSize, selectedCategoryId],
+  );
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadData();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
+    void loadData();
   }, [loadData]);
 
   const clearMessageSoon = () => {
     setTimeout(() => setMessage(null), 3000);
+  };
+
+  const applyDetailSearch = () => {
+    setCurrentPage(1);
+    setAppliedSearchTerm(searchInput.trim());
+  };
+
+  const clearDetailSearch = () => {
+    setSearchInput("");
+    setAppliedSearchTerm("");
+    setCurrentPage(1);
   };
 
   const resolveWikipediaName = (rawInput?: string, fallbackTitle?: string) => {
@@ -298,26 +377,29 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
 
     try {
       const parsed = new URL(input);
-      const wikiIndex = parsed.pathname.indexOf("/wiki/");
-      if (wikiIndex >= 0) {
+
+      // Case 1: URL has /wiki/PageTitle format
+      if (parsed.pathname.includes("/wiki/")) {
+        const wikiIndex = parsed.pathname.indexOf("/wiki/");
         const encoded = parsed.pathname.slice(wikiIndex + 6);
         if (encoded) {
           return decodeURIComponent(encoded).replace(/_/g, " ").trim();
         }
       }
+
+      // Case 2: URL has ?curid=XXXXX format - can't extract title from URL alone, use fallback
+      if (parsed.search.includes("curid=")) {
+        // Return fallback title since we can't extract from curid-only URL
+        return (fallbackTitle || "").trim() || input;
+      }
+
+      // Not a URL we recognize, return as-is
       return input;
     } catch {
+      // Not a valid URL, return as-is (likely already a page title)
       return input;
     }
   };
-
-  const normalizeText = (value?: string | null) =>
-    (value || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .trim();
 
   const isWikipediaPayloadSuccess = (payload?: unknown) => {
     if (!payload || typeof payload !== "object") return false;
@@ -434,6 +516,9 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     const data = payload as Record<string, unknown>;
     if (typeof data.jobId === "string") return data.jobId;
     if (typeof data.job_id === "string") return data.job_id;
+    if (Array.isArray(data.jobIds) && typeof data.jobIds[0] === "string") {
+      return data.jobIds[0];
+    }
 
     if (typeof data.message === "string") {
       const extracted = extractJobIdFromText(data.message);
@@ -459,6 +544,9 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     if (typeof nested?.jobId === "string") {
       return nested.jobId;
     }
+    if (Array.isArray(nested?.jobIds) && typeof nested.jobIds[0] === "string") {
+      return nested.jobIds[0];
+    }
 
     return "";
   };
@@ -476,10 +564,10 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       PIPELINE_MAX_WAIT_MS / PIPELINE_POLL_INTERVAL_MS,
     );
 
-    let graphCompleted = false;
-    let chunkCompleted = false;
-    let graphFailedReason = graphJobId ? "" : "Không có graphJobId.";
-    let chunkFailedReason = chunkJobId ? "" : "Không có chunkJobId.";
+    let graphCompleted = !graphJobId;
+    let chunkCompleted = !chunkJobId;
+    let graphFailedReason = "";
+    let chunkFailedReason = "";
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       if (graphJobId && !graphCompleted && !graphFailedReason) {
@@ -569,6 +657,25 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     };
   };
 
+  const shouldRecoverGraphPipeline = (error?: string) => {
+    const text = (error || "").toLowerCase();
+    return (
+      text.includes("graph") ||
+      text.includes("graphrag") ||
+      text.includes("không có graphjobid") ||
+      text.includes("khong co graphjobid")
+    );
+  };
+
+  const shouldRecoverChunkPipeline = (error?: string) => {
+    const text = (error || "").toLowerCase();
+    return (
+      text.includes("chunk") ||
+      text.includes("rag") ||
+      text.includes("không có chunkjobid") ||
+      text.includes("khong co chunkjobid")
+    );
+  };
   const extractWikipediaResult = (
     responseData?: Record<string, unknown> | null,
   ) => {
@@ -619,19 +726,101 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     };
   };
 
+  const searchWikipediaPerson = async (keyword: string) => {
+    const trimmedKeyword = keyword.trim();
+    if (!trimmedKeyword) {
+      setSelectedWikiResult(null);
+      setWikiSearchResults([]);
+      return;
+    }
+
+    setWikiSearching(true);
+    const response = await adminService.getPersonSummaryDetail({
+      entityName: trimmedKeyword,
+      language: "vi",
+      isAutoSave: false,
+    });
+
+    if (response.success && response.data) {
+      const results = response.data;
+      const normalizedKeyword = trimmedKeyword.toLowerCase();
+      const matchedSelection = selectedWikiResult
+        ? results.find(
+            (item) =>
+              item.id === selectedWikiResult.id ||
+              (item.title || "").trim().toLowerCase() ===
+                (selectedWikiResult.title || "").trim().toLowerCase(),
+          )
+        : null;
+      const nextSelectedResult =
+        matchedSelection ||
+        results.find(
+          (item) => item.title?.trim().toLowerCase() === normalizedKeyword,
+        ) ||
+        results.find((item) =>
+          item.title?.trim().toLowerCase().includes(normalizedKeyword),
+        ) ||
+        results[0];
+
+      setWikiSearchResults(results);
+      setSelectedWikiResult(nextSelectedResult || null);
+    } else {
+      setSelectedWikiResult(null);
+      setWikiSearchResults([]);
+      showError(response.error || "Không tìm thấy dữ liệu từ Wikipedia.");
+      clearMessageSoon();
+    }
+
+    setWikiSearching(false);
+  };
+
+  useEffect(() => {
+    const keyword = wikiSearchKeyword.trim();
+
+    if (!keyword) {
+      setWikiSearching(false);
+      setSelectedWikiResult(null);
+      setWikiSearchResults([]);
+      return;
+    }
+
+    if (keyword.length < 2) {
+      setWikiSearching(false);
+      setSelectedWikiResult(null);
+      setWikiSearchResults([]);
+      return;
+    }
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      if (isCancelled) return;
+      await searchWikipediaPerson(keyword);
+    }, 450);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [wikiSearchKeyword]);
+
   const handleCreateDetail = async () => {
+    const pageTitle =
+      selectedWikiResult?.title?.trim() || wikiSearchKeyword.trim();
     const wikiName = resolveWikipediaName(
-      newDetail.wikipediaUrl,
-      newDetail.title,
+      selectedWikiResult?.wikipediaUrl || pageTitle,
+      selectedWikiResult?.title || newDetail.title,
     );
-    if (!newDetail.categoryId || !newDetail.title.trim()) {
-      showError("Vui lòng nhập đủ danh mục và tiêu đề.");
+    const categoryId = newDetail.categoryId.trim();
+    const selectedTitle = selectedWikiResult?.title?.trim() || "";
+
+    if (!categoryId) {
+      showError("Vui lòng chọn danh mục.");
       clearMessageSoon();
       return;
     }
 
-    if (!wikiName) {
-      showError("Vui lòng nhập Wikipedia URL hoặc tiêu đề danh nhân.");
+    if (!pageTitle) {
+      showError("Vui lòng nhập tên danh nhân để cập nhật từ Wikipedia.");
       clearMessageSoon();
       return;
     }
@@ -645,15 +834,13 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     const [graphResult, ragResult] = await Promise.allSettled([
       adminService.fetchWikipediaContentForDetail({
         name: wikiName,
-        customTitle: newDetail.title.trim() || undefined,
+        customTitle: selectedTitle || newDetail.title.trim() || undefined,
         language: "vi",
-        targetPerson: newDetail.title.trim() || wikiName,
+        targetPerson: selectedTitle || newDetail.title.trim() || wikiName,
       }),
-      adminService.createRagDocumentFromWikipedia({
-        name: wikiName,
-        customTitle: newDetail.title.trim() || undefined,
-        chunkSize: 600,
-        chunkOverlap: 150,
+      adminService.updateDetailFromWikipedia({
+        categoryId,
+        pageTitle: wikiName,
         language: "vi",
       }),
     ]);
@@ -665,15 +852,11 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     if (!ragResponse?.success && isRetryableStatusError(ragResponse?.error)) {
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         await sleep(1200);
-        const retryResponse = await adminService.createRagDocumentFromWikipedia(
-          {
-            name: wikiName,
-            customTitle: newDetail.title.trim() || undefined,
-            chunkSize: 600,
-            chunkOverlap: 150,
-            language: "vi",
-          },
-        );
+        const retryResponse = await adminService.updateDetailFromWikipedia({
+          categoryId,
+          pageTitle: wikiName,
+          language: "vi",
+        });
 
         ragResponse = retryResponse;
 
@@ -707,14 +890,14 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     if (!canContinueGraph && !canContinueRag) {
       const timeoutHint =
         canContinueGraph && !canContinueRag && isTimeoutError(ragError)
-          ? "GraphRAG da queue thanh cong, nhung chunking dang timeout o BE (HttpClient 120s)."
+          ? "GraphRAG da queue thanh cong, nhung update-from-wikipedia dang timeout o BE."
           : "";
 
       const finalError =
         [
           timeoutHint,
           graphError ? `GraphRAG: ${graphError}` : "",
-          ragError ? `Chunking: ${ragError}` : "",
+          ragError ? `UpdateFromWikipedia: ${ragError}` : "",
         ]
           .filter(Boolean)
           .join(" | ") || "Không thể lấy dữ liệu từ Wikipedia.";
@@ -727,47 +910,143 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       return;
     }
 
-    const graphJobId =
+    let graphJobId =
       extractGraphJobId(graphResponse?.data) || graphJobIdFromError;
-    const chunkJobId =
+    let chunkJobId =
       extractChunkJobId(ragResponse?.data) || chunkJobIdFromError;
 
-    if (!graphJobId && !chunkJobId) {
-      failCreatePipelineProgress(
-        "Không lấy được thông tin job để kiểm tra trạng thái pipeline.",
-        "jobs",
-      );
-      showError(
-        "Không lấy được thông tin job để kiểm tra trạng thái pipeline.",
-      );
+    // update-from-wikipedia often provides a single jobId used by both pipelines.
+    if (!graphJobId && chunkJobId) {
+      graphJobId = chunkJobId;
+    }
+    if (!chunkJobId && graphJobId) {
+      chunkJobId = graphJobId;
+    }
+
+    const graphReadyWithoutJob = isGraphSuccess && !graphJobId;
+    const chunkReadyWithoutJob = isRagSuccess && !chunkJobId;
+    const canSkipPolling = graphReadyWithoutJob && chunkReadyWithoutJob;
+
+    if (!graphJobId && !chunkJobId && !canSkipPolling) {
+      const missingJobError =
+        "Không lấy được thông tin job để kiểm tra trạng thái pipeline.";
+      failCreatePipelineProgress(missingJobError, "jobs");
+      showError(missingJobError);
       setSubmitting(false);
       setWikiLoadingTarget(null);
       clearMessageSoon();
       return;
     }
 
-    updateCreatePipelineProgress(
-      "polling",
-      "Đang đợi GraphRAG và chunking xử lý xong (tối đa 8 phút).",
-    );
+    let pipelineResult: PipelineWaitResult = {
+      success: true,
+      graphCompleted: graphReadyWithoutJob,
+      chunkCompleted: chunkReadyWithoutJob,
+    };
 
-    const pipelineResult = await waitForPipelineSuccess(graphJobId, chunkJobId);
-    if (!pipelineResult.success) {
-      failCreatePipelineProgress(
-        pipelineResult.error || "Pipeline xử lý chưa hoàn tất.",
-        "polling",
-      );
-      showError(pipelineResult.error || "Pipeline xử lý chưa hoàn tất.");
-      setSubmitting(false);
-      setWikiLoadingTarget(null);
-      clearMessageSoon();
-      return;
-    }
-
-    if (pipelineResult.warning) {
+    if (!canSkipPolling) {
       updateCreatePipelineProgress(
         "polling",
-        `Pipeline hoàn tất một phần: ${pipelineResult.warning}`,
+        "Đang đợi GraphRAG và chunking xử lý xong (tối đa 8 phút).",
+      );
+
+      pipelineResult = await waitForPipelineSuccess(graphJobId, chunkJobId);
+      if (!pipelineResult.success) {
+        for (
+          let recoveryAttempt = 1;
+          recoveryAttempt <= PIPELINE_RECOVERY_MAX_ATTEMPTS;
+          recoveryAttempt += 1
+        ) {
+          const needGraphRecovery =
+            !graphJobId || shouldRecoverGraphPipeline(pipelineResult.error);
+          const needChunkRecovery =
+            !chunkJobId || shouldRecoverChunkPipeline(pipelineResult.error);
+
+          if (!needGraphRecovery && !needChunkRecovery) {
+            break;
+          }
+
+          updateCreatePipelineProgress(
+            "polling",
+            `Pipeline lỗi, đang tự khởi tạo lại job (lần ${recoveryAttempt}/${PIPELINE_RECOVERY_MAX_ATTEMPTS})...`,
+          );
+
+          if (needChunkRecovery) {
+            const recoveredChunk = await adminService.updateDetailFromWikipedia(
+              {
+                categoryId,
+                pageTitle: wikiName,
+                language: "vi",
+              },
+            );
+
+            if (recoveredChunk.success) {
+              ragResponse = recoveredChunk;
+              const recoveredChunkJobId =
+                extractChunkJobId(recoveredChunk.data) ||
+                extractJobIdFromText(recoveredChunk.data?.message);
+              if (recoveredChunkJobId) {
+                chunkJobId = recoveredChunkJobId;
+                if (!graphJobId) {
+                  graphJobId = recoveredChunkJobId;
+                }
+              }
+            }
+          }
+
+          if (needGraphRecovery) {
+            const recoveredGraph =
+              await adminService.fetchWikipediaContentForDetail({
+                name: wikiName,
+                customTitle:
+                  selectedTitle || newDetail.title.trim() || undefined,
+                language: "vi",
+                targetPerson:
+                  selectedTitle || newDetail.title.trim() || wikiName,
+              });
+
+            if (recoveredGraph.success) {
+              const recoveredGraphJobId =
+                extractGraphJobId(recoveredGraph.data) ||
+                extractJobIdFromText(recoveredGraph.data?.message);
+              if (recoveredGraphJobId) {
+                graphJobId = recoveredGraphJobId;
+                if (!chunkJobId) {
+                  chunkJobId = recoveredGraphJobId;
+                }
+              }
+            }
+          }
+
+          pipelineResult = await waitForPipelineSuccess(graphJobId, chunkJobId);
+          if (pipelineResult.success) {
+            break;
+          }
+        }
+      }
+
+      if (!pipelineResult.success) {
+        failCreatePipelineProgress(
+          pipelineResult.error || "Pipeline xử lý chưa hoàn tất.",
+          "polling",
+        );
+        showError(pipelineResult.error || "Pipeline xử lý chưa hoàn tất.");
+        setSubmitting(false);
+        setWikiLoadingTarget(null);
+        clearMessageSoon();
+        return;
+      }
+
+      if (pipelineResult.warning) {
+        updateCreatePipelineProgress(
+          "polling",
+          `Pipeline hoàn tất một phần: ${pipelineResult.warning}`,
+        );
+      }
+    } else {
+      updateCreatePipelineProgress(
+        "polling",
+        "Backend không trả jobId, bỏ qua theo dõi trạng thái và tiếp tục lưu dữ liệu.",
       );
     }
 
@@ -782,9 +1061,15 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     const resolvedContent = extractedContent || ragExtract.extractedContent;
     const resolvedUrl = extractedUrl || ragExtract.extractedUrl;
 
-    const finalTitle = (resolvedTitle || newDetail.title || "").trim();
+    const finalTitle = (
+      resolvedTitle ||
+      selectedWikiResult?.title ||
+      newDetail.title ||
+      ""
+    ).trim();
     const finalWikipediaUrl = (
       resolvedUrl ||
+      selectedWikiResult?.wikipediaUrl ||
       newDetail.wikipediaUrl ||
       ""
     ).trim();
@@ -794,10 +1079,11 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       if (!sameCategory) return false;
 
       const sameTitle =
-        normalizeText(detail.title) === normalizeText(finalTitle);
+        normalizeLookupValue(detail.title) === normalizeLookupValue(finalTitle);
       const sameWikiUrl =
         finalWikipediaUrl &&
-        normalizeText(detail.wikipediaUrl) === normalizeText(finalWikipediaUrl);
+        normalizeLookupValue(detail.wikipediaUrl) ===
+          normalizeLookupValue(finalWikipediaUrl);
 
       return sameTitle || Boolean(sameWikiUrl);
     });
@@ -820,12 +1106,25 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       "Đang lưu dữ liệu danh nhân vào hệ thống.",
     );
 
-    const saveResponse = existingDetail
+    let saveResponse = existingDetail
       ? await adminService.updateAdminDetail(existingDetail.id, payload)
       : await adminService.createAdminDetail({
           categoryId: newDetail.categoryId,
           ...payload,
         });
+
+    // update-from-wikipedia can delete/recreate the underlying Document;
+    // when that happens, existingDetail.id becomes stale and update returns not found.
+    if (
+      !saveResponse.success &&
+      existingDetail &&
+      (saveResponse.error || "").toLowerCase().includes("not found")
+    ) {
+      saveResponse = await adminService.createAdminDetail({
+        categoryId: newDetail.categoryId,
+        ...payload,
+      });
+    }
 
     if (saveResponse.success) {
       completeCreatePipelineProgress(
@@ -841,13 +1140,19 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
           ? `${baseSuccessMessage} Lưu ý: ${pipelineResult.warning}`
           : baseSuccessMessage,
       );
+      setWikiSearchKeyword("");
+      setSelectedWikiResult(null);
+      setWikiSearchResults([]);
       setNewDetail((prev) => ({
         ...prev,
         title: "",
         content: "",
         wikipediaUrl: "",
       }));
-      await loadData();
+      setAppliedSearchTerm("");
+      setSearchInput("");
+      setCurrentPage(1);
+      await loadData(true);
     } else {
       failCreatePipelineProgress(
         saveResponse.error || "Không thể cập nhật danh nhân.",
@@ -859,6 +1164,16 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     setSubmitting(false);
     setWikiLoadingTarget(null);
     clearMessageSoon();
+  };
+
+  const handleSelectWikipediaResult = (result: WikipediaSearchResultDto) => {
+    setSelectedWikiResult(result);
+    setNewDetail((prev) => ({
+      ...prev,
+      title: result.title || prev.title,
+      content: result.content || prev.content,
+      wikipediaUrl: result.wikipediaUrl || prev.wikipediaUrl,
+    }));
   };
 
   const handleAutoFillEditFromWikipedia = async () => {
@@ -931,7 +1246,7 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
     if (response.success) {
       showSuccess("Tạo danh mục thành công.");
       setNewCategory({ name: "", description: "" });
-      await loadData();
+      await loadData(true);
     } else {
       showError(response.error || "Không thể tạo danh mục.");
     }
@@ -960,7 +1275,7 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
           ? "Xóa danh mục thành công."
           : "Xóa danh nhân thành công.",
       );
-      await loadData();
+      await loadData(true);
     } else {
       showError(response.error || "Không thể xóa dữ liệu.");
     }
@@ -1011,7 +1326,7 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       showSuccess("Cập nhật danh mục thành công.");
       setEditCategoryModalOpen(false);
       setEditingCategory(null);
-      await loadData();
+      await loadData(true);
     } else {
       showError(response.error || "Không thể cập nhật danh mục.");
     }
@@ -1043,9 +1358,21 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
 
     if (response.success) {
       showSuccess("Cập nhật danh nhân thành công.");
+      setDetails((prev) =>
+        prev.map((d) =>
+          d.id === editingDetail.id
+            ? {
+                ...d,
+                title: editDetailData.title?.trim() ?? d.title,
+                content: editDetailData.content?.trim() ?? d.content,
+                wikipediaUrl:
+                  editDetailData.wikipediaUrl?.trim() || d.wikipediaUrl,
+              }
+            : d,
+        ),
+      );
       setEditDetailModalOpen(false);
       setEditingDetail(null);
-      await loadData();
     } else {
       showError(response.error || "Không thể cập nhật danh nhân.");
     }
@@ -1214,145 +1541,21 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       {showDetailManagement && (
         <>
           {/* Detail create */}
-          <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-5 h-px bg-slate-300" />
-              <h3 className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
-                Cập nhật danh nhân
-              </h3>
-            </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Chức năng: thêm danh nhân theo danh mục, chỉnh sửa nội dung và xóa
-              bản ghi không còn sử dụng.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <select
-                value={newDetail.categoryId}
-                onChange={(e) =>
-                  setNewDetail((prev) => ({
-                    ...prev,
-                    categoryId: e.target.value,
-                  }))
-                }
-                className="px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-              >
-                <option value="">Chọn danh mục</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={newDetail.title}
-                onChange={(e) =>
-                  setNewDetail((prev) => ({ ...prev, title: e.target.value }))
-                }
-                placeholder="Tiêu đề danh nhân"
-                className="px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-              />
-              <input
-                type="text"
-                value={newDetail.wikipediaUrl || ""}
-                onChange={(e) =>
-                  setNewDetail((prev) => ({
-                    ...prev,
-                    wikipediaUrl: e.target.value,
-                  }))
-                }
-                placeholder="Wikipedia URL (tùy chọn)"
-                className="md:col-span-2 px-4 py-2.5 bg-white/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-sm"
-              />
-              <button
-                onClick={handleCreateDetail}
-                disabled={submitting || wikiLoadingTarget === "create"}
-                className="md:col-span-2 px-5 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors text-sm font-medium"
-              >
-                {wikiLoadingTarget === "create"
-                  ? "Đang cập nhật từ Wikipedia..."
-                  : "Cập nhật"}
-              </button>
-
-              {createPipelineProgress.visible && (
-                <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-3.5">
-                  <div className="flex items-center justify-between gap-3 mb-2.5">
-                    <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                      Tiến trình cập nhật
-                    </p>
-                    <span
-                      className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${
-                        createPipelineProgress.status === "success"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : createPipelineProgress.status === "error"
-                            ? "bg-red-50 text-red-700 border-red-200"
-                            : "bg-white text-slate-600 border-slate-200"
-                      }`}
-                    >
-                      {createPipelineProgress.status === "success"
-                        ? "Hoàn tất"
-                        : createPipelineProgress.status === "error"
-                          ? "Lỗi"
-                          : "Đang xử lý"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {CREATE_PIPELINE_STEPS.map((step, index) => {
-                      const activeIndex = CREATE_PIPELINE_STEPS.findIndex(
-                        (item) => item.id === createPipelineProgress.step,
-                      );
-                      const isDone = index < activeIndex;
-                      const isCurrent = index === activeIndex;
-
-                      return (
-                        <div
-                          key={step.id}
-                          className="flex items-center gap-2.5 text-xs"
-                        >
-                          <span
-                            className={`w-4 h-4 rounded-full border inline-flex items-center justify-center ${
-                              isDone
-                                ? "bg-emerald-100 border-emerald-300 text-emerald-700"
-                                : isCurrent
-                                  ? createPipelineProgress.status === "error"
-                                    ? "bg-red-100 border-red-300 text-red-700"
-                                    : "bg-slate-200 border-slate-300 text-slate-700"
-                                  : "bg-white border-slate-200 text-slate-300"
-                            }`}
-                          >
-                            {isDone ? "✓" : index + 1}
-                          </span>
-                          <span
-                            className={`${
-                              isCurrent
-                                ? createPipelineProgress.status === "error"
-                                  ? "text-red-700"
-                                  : "text-slate-700"
-                                : isDone
-                                  ? "text-slate-600"
-                                  : "text-slate-400"
-                            }`}
-                          >
-                            {step.label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <p className="text-xs text-slate-500 mt-3">
-                    {createPipelineProgress.note}
-                  </p>
-                  {createPipelineProgress.error && (
-                    <p className="text-xs text-red-600 mt-1">
-                      {createPipelineProgress.error}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          <CreateDetailForm
+            newDetail={newDetail}
+            wikiSearchKeyword={wikiSearchKeyword}
+            selectedWikiResult={selectedWikiResult}
+            wikiSearchResults={wikiSearchResults}
+            wikiSearching={wikiSearching}
+            submitting={submitting}
+            wikiLoadingTarget={wikiLoadingTarget}
+            createPipelineProgress={createPipelineProgress}
+            categories={categories}
+            onNewDetailChange={setNewDetail}
+            onWikiSearchKeywordChange={setWikiSearchKeyword}
+            onSelectWikipediaResult={handleSelectWikipediaResult}
+            onCreateDetail={handleCreateDetail}
+          />
 
           {/* Detail list */}
           <div className="bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-xl overflow-hidden">
@@ -1360,13 +1563,16 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
               <p className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
                 Danh sách danh nhân
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] text-slate-400 hidden sm:inline">
                   Lọc theo danh mục
                 </span>
                 <select
                   value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedCategoryId(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="px-3 py-1.5 bg-white/80 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-xs text-slate-700"
                 >
                   <option value="all">Tất cả</option>
@@ -1376,7 +1582,30 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
                     </option>
                   ))}
                 </select>
+                <select
+                  value={detailPageSize}
+                  onChange={(e) => {
+                    setDetailPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-3 py-1.5 bg-white/80 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-300/50 text-xs text-slate-700"
+                  title="Số bản ghi mỗi trang"
+                >
+                  <option value={10}>10 / trang</option>
+                  <option value={20}>20 / trang</option>
+                  <option value={50}>50 / trang</option>
+                </select>
+                <DetailSearchBar
+                  searchInput={searchInput}
+                  appliedSearchTerm={appliedSearchTerm}
+                  onSearchInputChange={setSearchInput}
+                  onApply={applyDetailSearch}
+                  onClear={clearDetailSearch}
+                />
               </div>
+              <span className="text-[11px] text-slate-400 text-right">
+                {pagingDisplayText}
+              </span>
             </div>
 
             {loading ? (
@@ -1392,94 +1621,44 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
             ) : (
               <div className="divide-y divide-slate-50">
                 {filteredDetails.map((detail) => (
-                  <div
+                  <DetailPersonCard
                     key={detail.id}
-                    className="px-5 py-4 hover:bg-slate-50/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                          <svg
-                            className="w-5 h-5 text-blue-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M12 6v6h4.5m6 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-700 truncate">
-                            {detail.title || "Chưa có tiêu đề"}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border bg-slate-50 text-slate-600 border-slate-200">
-                              {getDetailCategoryLabel(detail)}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              {new Date(detail.createdAt).toLocaleDateString(
-                                "vi-VN",
-                              )}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-2 line-clamp-2">
-                            {detail.content || "Không có nội dung"}
-                          </p>
-                          {detail.wikipediaUrl && (
-                            <p className="text-[11px] text-blue-600 mt-1 truncate">
-                              {detail.wikipediaUrl}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => openEditDetail(detail)}
-                          className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                          title="Chỉnh sửa danh nhân"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
-                            />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleOpenDelete("detail", detail.id)}
-                          className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Xóa danh nhân"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    detail={detail}
+                    categoryLabel={getDetailCategoryLabel(detail)}
+                    onEdit={openEditDetail}
+                    onDelete={(id) => handleOpenDelete("detail", id)}
+                  />
                 ))}
+              </div>
+            )}
+
+            {!loading && detailPaging.totalPages > 1 && (
+              <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs text-slate-500">
+                  Trang {detailPaging.pageNumber}/{detailPaging.totalPages}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
+                    disabled={!detailPaging.hasPreviousPage || loading}
+                    className="px-3 py-1.5 text-xs rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Trước
+                  </button>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) =>
+                        Math.min(detailPaging.totalPages, prev + 1),
+                      )
+                    }
+                    disabled={!detailPaging.hasNextPage || loading}
+                    className="px-3 py-1.5 text-xs rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Sau
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -49,6 +49,16 @@ export interface AdminChatSessionDtoPagedResult {
   hasNextPage: boolean;
 }
 
+export interface DetailDtoPagedResult {
+  items: DetailDto[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
 export interface AdminStatsDto {
   totalUsers: number;
   totalChatSessions: number;
@@ -84,10 +94,16 @@ export interface DetailDto {
   id: string;
   title: string | null;
   content: string | null;
+  description: string | null;
+  thumbnailUrl?: string | null;
   wikipediaUrl: string | null;
   categoryId: string | null;
   categoryName: string | null;
   createdAt: string;
+}
+
+export interface WikipediaSearchResultDto extends DetailDto {
+  pageId?: number | null;
 }
 
 export interface WikipediaPersonSummaryRequestDto {
@@ -172,6 +188,21 @@ export interface WikipediaDocumentResponseDto {
   wikipediaTitle?: string;
   wikipediaExtract?: string;
   wikipediaUrl?: string;
+}
+
+export interface WikipediaUpdateFromDetailRequestDto {
+  categoryId: string;
+  pageTitle: string;
+  language?: string;
+}
+
+export interface WikipediaUpdateFromDetailResponseDto {
+  message?: string;
+  categoryId?: string;
+  pageTitle?: string;
+  language?: string;
+  thumbnailUrl?: string | null;
+  documents?: unknown;
 }
 
 export interface GraphRagNodeStatusResponseDto {
@@ -384,6 +415,38 @@ const normalizeAdminChatSessionsPaged = (
   };
 };
 
+const normalizeAdminDetailsPaged = (
+  data: unknown,
+): DetailDtoPagedResult => {
+  const record = (data || {}) as Record<string, any>;
+  const rawItems = Array.isArray(record.items)
+    ? record.items
+    : Array.isArray(record.Items)
+      ? record.Items
+      : [];
+
+  const items = rawItems.map((detail) => sanitizeDetailDto(detail as DetailDto));
+
+  const pageSize = Number((record.pageSize ?? record.PageSize ?? items.length) || 10);
+  const totalCount = Number((record.totalCount ?? record.TotalCount ?? items.length) || 0);
+  const pageNumber = Number(record.pageNumber ?? record.PageNumber ?? 1);
+  const totalPages = Number(
+    record.totalPages ??
+      record.TotalPages ??
+      (pageSize > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1),
+  );
+
+  return {
+    items,
+    totalCount,
+    pageNumber,
+    pageSize,
+    totalPages,
+    hasPreviousPage: pageNumber > 1,
+    hasNextPage: pageNumber < totalPages,
+  };
+};
+
 export const adminService = {
   // ==================== STATS ====================
   
@@ -391,26 +454,20 @@ export const adminService = {
   async getStats(): Promise<ApiResponse<AdminStatsDto>> {
     try {
       const url = `${API_BASE_URL}/admin/stats`;
-      console.log('📊 Fetching stats from:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
 
-      console.log('📊 Stats response status:', response.status);
-
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        console.error('📊 Stats error:', response.status, data);
         return { success: false, error: data?.message || data?.detail || `Lỗi lấy thống kê (HTTP ${response.status})` };
       }
 
       const data = await safeJsonParse(response);
-      console.log('📊 Stats data:', data);
       return { success: true, data };
     } catch (error) {
-      console.error('📊 Stats fetch error:', error);
       return { success: false, error: `Lỗi kết nối server: ${error}` };
     }
   },
@@ -419,23 +476,18 @@ export const adminService = {
   async getDailyStats(days: number = 7): Promise<ApiResponse<DailyStatsDto[]>> {
     try {
       const url = `${API_BASE_URL}/admin/stats/daily?days=${days}`;
-      console.log('📈 Fetching daily stats from:', url);
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
 
-      console.log('📈 Daily stats response status:', response.status);
-
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        console.error('📈 Daily stats error:', response.status, data);
         return { success: false, error: data?.message || data?.detail || `Lỗi lấy thống kê (HTTP ${response.status})` };
       }
 
       const data = await safeJsonParse(response);
-      console.log('📈 Daily stats data:', data);
       return { success: true, data };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
@@ -786,75 +838,107 @@ export const adminService = {
     }
   },
 
-  // Get person detail by name from Wikipedia summary endpoint
+  // Get person detail by name from Wiki Backend search-from-wikipedia endpoint
   async getPersonSummaryDetail(
     payload: WikipediaPersonSummaryRequestDto,
-  ): Promise<ApiResponse<DetailDto>> {
+  ): Promise<ApiResponse<WikipediaSearchResultDto[]>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/wikipedia/person-summary`, {
-        method: 'POST',
-        headers: getPublicHeaders(),
-        body: JSON.stringify({
-          entityName: payload.entityName,
-          language: payload.language || 'vi',
-          isAutoSave: payload.isAutoSave ?? false,
-        }),
+      const keyword = (payload.entityName || '').trim();
+      if (!keyword) {
+        return { success: false, error: 'Tên danh nhân không được để trống' };
+      }
+
+      const language = payload.language || 'vi';
+      const query = new URLSearchParams({
+        keyword,
+        language,
+        limit: '5',
       });
 
-      const rawData = (await safeJsonParse(response)) as WikipediaPersonSummaryResponseDto | null;
+      const response = await fetch(
+        `${API_BASE_URL}/Document/search-from-wikipedia?${query.toString()}`,
+        {
+          method: 'GET',
+          headers: getPublicHeaders(),
+        },
+      );
+
+      const rawData = await safeJsonParse(response);
 
       if (!response.ok) {
+        const record = rawData as Record<string, unknown> | null;
         return {
           success: false,
           error:
-            rawData?.message ||
+            (typeof record?.message === 'string' ? record.message : null) ||
             `Lỗi lấy chi tiết danh nhân (HTTP ${response.status})`,
         };
       }
 
-      const personSummary = rawData?.data;
-      if (!personSummary) {
+      const items = Array.isArray(rawData) ? rawData : [];
+      if (items.length === 0) {
         return { success: false, error: 'Không có dữ liệu chi tiết danh nhân' };
       }
 
-      const summaryRecord = personSummary as Record<string, unknown>;
-      const nestedRecord =
-        summaryRecord.data && typeof summaryRecord.data === 'object'
-          ? (summaryRecord.data as Record<string, unknown>)
-          : null;
-
-      const pickString = (...values: unknown[]) => {
+      const pickString = (...values: unknown[]): string | null => {
         for (const value of values) {
+          if (typeof value === 'string' && value.trim()) return value.trim();
+        }
+        return null;
+      };
+
+      const pickNumber = (...values: unknown[]): number | null => {
+        for (const value of values) {
+          if (typeof value === 'number' && Number.isFinite(value)) return value;
           if (typeof value === 'string' && value.trim()) {
-            return value.trim();
+            const parsed = Number(value);
+            if (Number.isFinite(parsed)) return parsed;
           }
         }
         return null;
       };
 
-      const resolvedWikipediaUrl = pickString(
-        personSummary.sourceUrl,
-        personSummary.wikipediaUrl,
-        personSummary.url,
-        nestedRecord?.sourceUrl,
-        nestedRecord?.wikipediaUrl,
-        nestedRecord?.url,
-      );
+      const mappedDetails = items
+        .map((item, index) => {
+          const source = item as Record<string, unknown>;
+          const title = normalizeEntityTitle(pickString(source.title));
+          const wikipediaUrl = pickString(source.pageUrl, source.wikipediaUrl, source.url, source.sourceUrl);
+          const thumbnailUrl = pickString(
+            source.thumbnailUrl,
+            source.thumbnail,
+            source.thumbnail_url,
+            (source.thumbnail as Record<string, unknown> | undefined)?.source,
+            (source.originalimage as Record<string, unknown> | undefined)?.source,
+            source.imageUrl,
+          );
 
-      const mappedDetail: DetailDto = {
-        id: payload.entityName,
-        title:
-          (normalizeEntityTitle(personSummary.name) as string | null) ||
-          (normalizeEntityTitle(payload.entityName) as string | null) ||
-          payload.entityName,
-        content: (sanitizeEscapedText(personSummary.summary) as string | null) || null,
-        wikipediaUrl: resolvedWikipediaUrl,
-        categoryId: null,
-        categoryName: null,
-        createdAt: personSummary.extractedDate || new Date().toISOString(),
-      };
+          const pageId = pickNumber(source.pageId, source.pageid, source.id);
+          const stableId = pageId !== null ? `wiki-${pageId}` : `wiki-${keyword}-${index}`;
 
-      return { success: true, data: mappedDetail };
+          const mapped: WikipediaSearchResultDto = {
+            id: stableId,
+            pageId,
+            title: (title as string | null) || null,
+            content:
+              (sanitizeEscapedText(pickString(source.extract, source.description, source.summary)) as string | null) ||
+              null,
+            description: null,
+            wikipediaUrl,
+            thumbnailUrl,
+            categoryId: null,
+            categoryName: null,
+            createdAt: new Date().toISOString(),
+          };
+
+          return mapped;
+        })
+        .filter((item) => Boolean(item.title || item.content || item.wikipediaUrl));
+
+      if (mappedDetails.length === 0) {
+        return { success: false, error: 'Không có dữ liệu chi tiết danh nhân' };
+      }
+
+      return { success: true, data: mappedDetails };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }
@@ -965,10 +1049,27 @@ export const adminService = {
 
   // ==================== ADMIN DETAILS ====================
 
-  // Get admin details
-  async getAdminDetails(): Promise<ApiResponse<DetailDto[]>> {
+  // Get admin details with pagination
+  async getAdminDetails(params?: {
+    pageNumber?: number;
+    pageSize?: number;
+    categoryId?: string;
+    searchTerm?: string;
+    sortBy?: string;
+    sortDescending?: boolean;
+  }): Promise<ApiResponse<DetailDtoPagedResult>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/details`, {
+      const queryParams = new URLSearchParams();
+      if (params?.pageNumber) queryParams.append('PageNumber', params.pageNumber.toString());
+      if (params?.pageSize) queryParams.append('PageSize', params.pageSize.toString());
+      if (params?.categoryId && params.categoryId !== 'all') queryParams.append('CategoryId', params.categoryId);
+      if (params?.searchTerm) queryParams.append('SearchTerm', params.searchTerm);
+      if (params?.sortBy) queryParams.append('SortBy', params.sortBy);
+      if (params?.sortDescending !== undefined) queryParams.append('SortDescending', params.sortDescending.toString());
+
+      const url = `${API_BASE_URL}/admin/details${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -979,8 +1080,7 @@ export const adminService = {
       }
 
       const data = await safeJsonParse(response);
-      const list = Array.isArray(data) ? data : [];
-      return { success: true, data: list.map((detail) => sanitizeDetailDto(detail as DetailDto)) };
+      return { success: true, data: normalizeAdminDetailsPaged(data) };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }
@@ -1157,6 +1257,39 @@ export const adminService = {
       }
 
       return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Lỗi kết nối server' };
+    }
+  },
+
+  // Ingest/update detail document from Wikipedia by page title
+  async updateDetailFromWikipedia(
+    payload: WikipediaUpdateFromDetailRequestDto,
+  ): Promise<ApiResponse<WikipediaUpdateFromDetailResponseDto>> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/Document/update-from-wikipedia`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          categoryId: payload.categoryId,
+          pageTitle: payload.pageTitle,
+          language: payload.language || 'vi',
+        }),
+      });
+
+      const data = await safeJsonParse(response);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi ingest từ Wikipedia (HTTP ${response.status})`,
+        };
+      }
+
+      return { success: true, data };
     } catch (error) {
       return { success: false, error: 'Lỗi kết nối server' };
     }

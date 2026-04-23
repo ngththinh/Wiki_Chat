@@ -1,17 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import authService from "@/lib/authService";
-import adminService, { AdminStatsDto, DailyStatsDto } from "@/lib/adminService";
 import { ROUTES } from "@/constants";
-import {
-  AdminSidebar,
-  OverviewTab,
-  UsersTab,
-  SessionsTab,
-  DocumentsTab,
-} from "@/components/admin";
+import { AdminSidebar } from "@/components/admin";
 
 type TabType = "dashboard" | "users" | "sessions" | "categories" | "details";
 
@@ -39,18 +32,19 @@ const getActiveTabFromPath = (pathname: string): TabType => {
   return "dashboard";
 };
 
-export default function AdminDashboard() {
+interface AdminRouteShellProps {
+  children: ReactNode;
+}
+
+export default function AdminRouteShell({ children }: AdminRouteShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
     useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Overview data
-  const [stats, setStats] = useState<AdminStatsDto | null>(null);
-  const [dailyStats, setDailyStats] = useState<DailyStatsDto[]>([]);
   const activeTab = getActiveTabFromPath(pathname);
 
   const handleTabChange = (tab: TabType) => {
@@ -67,24 +61,12 @@ export default function AdminDashboard() {
       return;
     }
     setUser(currentUser);
-    loadInitialData();
+    setIsAuthLoading(false);
   }, [router]);
 
-  const loadInitialData = async () => {
-    setIsLoading(true);
-    const [statsRes, dailyRes] = await Promise.all([
-      adminService.getStats(),
-      adminService.getDailyStats(7),
-    ]);
-    if (statsRes.success && statsRes.data) setStats(statsRes.data);
-    if (dailyRes.success && dailyRes.data) setDailyStats(dailyRes.data);
-    setIsLoading(false);
-  };
-
-  if (isLoading) {
+  if (isAuthLoading) {
     return (
       <div className="flex h-screen relative overflow-hidden">
-        {/* Same background as ChatScreen */}
         <div
           className="absolute inset-0"
           style={{
@@ -116,7 +98,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex h-screen relative overflow-hidden">
-      {/* Background — same editorial gradient as ChatScreen */}
       <div
         className="absolute inset-0"
         style={{
@@ -125,7 +106,6 @@ export default function AdminDashboard() {
         }}
       />
 
-      {/* Editorial grid pattern */}
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
@@ -137,10 +117,8 @@ export default function AdminDashboard() {
         }}
       />
 
-      {/* Glass editorial layer */}
       <div className="absolute inset-0 bg-slate-700/1 backdrop-blur-[0.2px]" />
 
-      {/* Mobile sidebar overlay */}
       {isMobileSidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden"
@@ -148,7 +126,6 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Sidebar — same drawer pattern as ChatScreen */}
       <div
         className={`fixed md:relative z-40 h-full transition-transform duration-300 ease-in-out md:translate-x-0 ${
           isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -164,9 +141,7 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* Main content area */}
       <div className="flex-1 flex flex-col relative z-10 min-w-0">
-        {/* Top bar — mobile header */}
         <header className="relative border-b border-slate-200/50 bg-white/40 backdrop-blur-sm md:hidden">
           <div className="px-3 py-3 flex items-center justify-between">
             <button
@@ -192,11 +167,10 @@ export default function AdminDashboard() {
                 {tabLabels[activeTab]}
               </span>
             </div>
-            <div className="w-9" /> {/* Spacer */}
+            <div className="w-9" />
           </div>
         </header>
 
-        {/* Desktop top bar */}
         <header className="relative border-b border-slate-200/50 bg-white/40 backdrop-blur-sm hidden md:block">
           <div className="px-6 lg:px-8 py-4 flex items-center justify-between">
             <div>
@@ -208,7 +182,6 @@ export default function AdminDashboard() {
               </p>
             </div>
 
-            {/* Tab pills for quick switch on desktop */}
             <div className="hidden lg:flex items-center gap-1 bg-slate-100/60 border border-slate-200/60 rounded-lg p-1">
               {(Object.keys(tabLabels) as TabType[]).map((tab) => (
                 <button
@@ -227,16 +200,9 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            {activeTab === "dashboard" && (
-              <OverviewTab stats={stats} dailyStats={dailyStats} />
-            )}
-            {activeTab === "users" && <UsersTab />}
-            {activeTab === "sessions" && <SessionsTab />}
-            {activeTab === "categories" && <DocumentsTab mode="categories" />}
-            {activeTab === "details" && <DocumentsTab mode="details" />}
+            {children}
           </div>
         </div>
       </div>
