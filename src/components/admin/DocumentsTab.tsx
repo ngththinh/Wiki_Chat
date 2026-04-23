@@ -10,6 +10,7 @@ import adminService, {
   UpdateCategoryDto,
   UpdateDetailDto,
   WikipediaSearchResultDto,
+  WikipediaUpdateFromDetailResponseDto,
 } from "@/lib/adminService";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import DetailPersonCard from "@/components/admin/DetailPersonCard";
@@ -1106,12 +1107,25 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       "Đang lưu dữ liệu danh nhân vào hệ thống.",
     );
 
-    let saveResponse = existingDetail
-      ? await adminService.updateAdminDetail(existingDetail.id, payload)
-      : await adminService.createAdminDetail({
-          categoryId: newDetail.categoryId,
-          ...payload,
-        });
+    // update-from-wikipedia already created/updated the Document in DB.
+    // Use the returned documentId to update that record instead of creating a duplicate.
+    const ragDocumentId =
+      (ragResponse?.data as WikipediaUpdateFromDetailResponseDto | null)
+        ?.documentId || null;
+
+    const targetDetailId = existingDetail?.id || ragDocumentId;
+    if (!targetDetailId) {
+      const missingTargetError =
+        "Không tìm thấy document để cập nhật từ Wikipedia.";
+      failCreatePipelineProgress(missingTargetError, "saving");
+      showError(missingTargetError);
+      setSubmitting(false);
+      setWikiLoadingTarget(null);
+      clearMessageSoon();
+      return;
+    }
+
+    let saveResponse = await adminService.updateAdminDetail(targetDetailId, payload);
 
     // update-from-wikipedia can delete/recreate the underlying Document;
     // when that happens, existingDetail.id becomes stale and update returns not found.
@@ -1120,21 +1134,17 @@ export default function DocumentsTab({ mode = "all" }: DocumentsTabProps) {
       existingDetail &&
       (saveResponse.error || "").toLowerCase().includes("not found")
     ) {
-      saveResponse = await adminService.createAdminDetail({
-        categoryId: newDetail.categoryId,
-        ...payload,
-      });
+      if (ragDocumentId && ragDocumentId !== existingDetail.id) {
+        saveResponse = await adminService.updateAdminDetail(ragDocumentId, payload);
+      }
     }
 
     if (saveResponse.success) {
       completeCreatePipelineProgress(
-        existingDetail
-          ? "Đã cập nhật danh nhân thành công."
-          : "Đã tạo danh nhân thành công.",
+        "Đã cập nhật danh nhân thành công.",
       );
-      const baseSuccessMessage = existingDetail
-        ? "Pipeline hoàn tất, đã cập nhật danh nhân theo lĩnh vực đã chọn."
-        : "Pipeline hoàn tất, đã tạo danh nhân theo lĩnh vực đã chọn.";
+      const baseSuccessMessage =
+        "Pipeline hoàn tất, đã cập nhật danh nhân theo lĩnh vực đã chọn.";
       showSuccess(
         pipelineResult.warning
           ? `${baseSuccessMessage} Lưu ý: ${pipelineResult.warning}`

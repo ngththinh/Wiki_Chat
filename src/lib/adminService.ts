@@ -1,10 +1,10 @@
-import authService from './authService';
+import authService from "./authService";
 
 // Admin API Service
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
 
 // Debug log
-console.log('🔧 Admin API Base URL:', API_BASE_URL);
+console.log("🔧 Admin API Base URL:", API_BASE_URL);
 
 // Types matching backend DTOs
 export interface AdminUserDto {
@@ -202,6 +202,7 @@ export interface WikipediaUpdateFromDetailResponseDto {
   pageTitle?: string;
   language?: string;
   thumbnailUrl?: string | null;
+  documentId?: string | null;
   documents?: unknown;
 }
 
@@ -281,18 +282,18 @@ interface ApiResponse<T> {
 const getAuthHeaders = () => {
   const token = authService.getToken();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   };
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   return headers;
 };
 
 const getPublicHeaders = (): Record<string, string> => ({
-  'Accept': 'application/json',
+  Accept: "application/json",
 });
 
 // Helper to safely parse JSON from response (handles empty/non-JSON bodies)
@@ -306,27 +307,31 @@ const safeJsonParse = async (response: Response) => {
   }
 };
 
-const sanitizeEscapedText = (value?: string | null): string | null | undefined => {
+const sanitizeEscapedText = (
+  value?: string | null,
+): string | null | undefined => {
   if (value === undefined || value === null) return value;
 
   return value
-    .replace(/\\r\\n|\\n|\\r/g, '\n')
-    .replace(/\\t/g, '\t')
+    .replace(/\\r\\n|\\n|\\r/g, "\n")
+    .replace(/\\t/g, "\t")
     .replace(/\\"/g, '"')
     .replace(/\\'/g, "'")
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/\u00a0/g, ' ')
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\u00a0/g, " ")
     .trim();
 };
 
-const normalizeEntityTitle = (value?: string | null): string | null | undefined => {
+const normalizeEntityTitle = (
+  value?: string | null,
+): string | null | undefined => {
   const sanitized = sanitizeEscapedText(value);
   if (sanitized === undefined || sanitized === null) return sanitized;
 
   return sanitized
-    .replace(/\.(md|txt|markdown|html|htm)$/i, '')
-    .replace(/_/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/\.(md|txt|markdown|html|htm)$/i, "")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 };
 
@@ -341,14 +346,14 @@ const sanitizeDetailPayload = <T extends UpdateDetailDto | CreateDetailDto>(
   payload: T,
 ): T => ({
   ...payload,
-  title: normalizeEntityTitle(payload.title) as T['title'],
-  content: sanitizeEscapedText(payload.content) as T['content'],
+  title: normalizeEntityTitle(payload.title) as T["title"],
+  content: sanitizeEscapedText(payload.content) as T["content"],
 });
 
 const normalizeAdminChatSession = (
   item: unknown,
 ): AdminChatSessionDto | null => {
-  if (!item || typeof item !== 'object') return null;
+  if (!item || typeof item !== "object") return null;
 
   const record = item as Record<string, any>;
 
@@ -366,19 +371,30 @@ const normalizeAdminChatSession = (
   return {
     id,
     userId,
-    username: (record.username ?? record.userName ?? record.UserName ?? null) as string | null,
-    sessionId: (record.sessionId ?? record.session_id ?? record.SessionId ?? '') as string,
-    sessionName: (record.sessionName ?? record.session_name ?? record.SessionName ?? null) as string | null,
+    username: (record.username ??
+      record.userName ??
+      record.UserName ??
+      null) as string | null,
+    sessionId: (record.sessionId ??
+      record.session_id ??
+      record.SessionId ??
+      "") as string,
+    sessionName: (record.sessionName ??
+      record.session_name ??
+      record.SessionName ??
+      null) as string | null,
     messageCount: Number.isFinite(messageCount) ? messageCount : 0,
-    createdAt: (record.createdAt ?? record.created_at ?? record.CreatedAt ?? new Date().toISOString()) as string,
-    updatedAt:
-      (record.updatedAt ??
-        record.updated_at ??
-        record.UpdatedAt ??
-        record.createdAt ??
-        record.created_at ??
-        record.CreatedAt ??
-        new Date().toISOString()) as string,
+    createdAt: (record.createdAt ??
+      record.created_at ??
+      record.CreatedAt ??
+      new Date().toISOString()) as string,
+    updatedAt: (record.updatedAt ??
+      record.updated_at ??
+      record.UpdatedAt ??
+      record.createdAt ??
+      record.created_at ??
+      record.CreatedAt ??
+      new Date().toISOString()) as string,
   };
 };
 
@@ -395,8 +411,12 @@ const normalizeAdminChatSessionsPaged = (
     .map((item) => normalizeAdminChatSession(item))
     .filter((item): item is AdminChatSessionDto => item !== null);
 
-  const pageSize = Number((record.pageSize ?? record.PageSize ?? items.length) || 10);
-  const totalCount = Number((record.totalCount ?? record.TotalCount ?? items.length) || 0);
+  const pageSize = Number(
+    (record.pageSize ?? record.PageSize ?? items.length) || 10,
+  );
+  const totalCount = Number(
+    (record.totalCount ?? record.TotalCount ?? items.length) || 0,
+  );
   const pageNumber = Number(record.pageNumber ?? record.PageNumber ?? 1);
   const totalPages = Number(
     record.totalPages ??
@@ -415,9 +435,7 @@ const normalizeAdminChatSessionsPaged = (
   };
 };
 
-const normalizeAdminDetailsPaged = (
-  data: unknown,
-): DetailDtoPagedResult => {
+const normalizeAdminDetailsPaged = (data: unknown): DetailDtoPagedResult => {
   const record = (data || {}) as Record<string, any>;
   const rawItems = Array.isArray(record.items)
     ? record.items
@@ -425,10 +443,16 @@ const normalizeAdminDetailsPaged = (
       ? record.Items
       : [];
 
-  const items = rawItems.map((detail) => sanitizeDetailDto(detail as DetailDto));
+  const items = rawItems.map((detail) =>
+    sanitizeDetailDto(detail as DetailDto),
+  );
 
-  const pageSize = Number((record.pageSize ?? record.PageSize ?? items.length) || 10);
-  const totalCount = Number((record.totalCount ?? record.TotalCount ?? items.length) || 0);
+  const pageSize = Number(
+    (record.pageSize ?? record.PageSize ?? items.length) || 10,
+  );
+  const totalCount = Number(
+    (record.totalCount ?? record.TotalCount ?? items.length) || 0,
+  );
   const pageNumber = Number(record.pageNumber ?? record.PageNumber ?? 1);
   const totalPages = Number(
     record.totalPages ??
@@ -449,20 +473,26 @@ const normalizeAdminDetailsPaged = (
 
 export const adminService = {
   // ==================== STATS ====================
-  
+
   // Get admin statistics
   async getStats(): Promise<ApiResponse<AdminStatsDto>> {
     try {
       const url = `${API_BASE_URL}/admin/stats`;
 
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy thống kê (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy thống kê (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
@@ -478,24 +508,30 @@ export const adminService = {
       const url = `${API_BASE_URL}/admin/stats/daily?days=${days}`;
 
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy thống kê (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy thống kê (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // ==================== USERS ====================
-  
+
   // Get users with pagination
   async getUsers(params?: {
     pageNumber?: number;
@@ -507,28 +543,38 @@ export const adminService = {
   }): Promise<ApiResponse<AdminUserDtoPagedResult>> {
     try {
       const queryParams = new URLSearchParams();
-      if (params?.pageNumber) queryParams.append('PageNumber', params.pageNumber.toString());
-      if (params?.pageSize) queryParams.append('PageSize', params.pageSize.toString());
-      if (params?.searchTerm) queryParams.append('SearchTerm', params.searchTerm);
-      if (params?.role) queryParams.append('Role', params.role);
-      if (params?.sortBy) queryParams.append('SortBy', params.sortBy);
-      if (params?.sortDescending !== undefined) queryParams.append('SortDescending', params.sortDescending.toString());
+      if (params?.pageNumber)
+        queryParams.append("PageNumber", params.pageNumber.toString());
+      if (params?.pageSize)
+        queryParams.append("PageSize", params.pageSize.toString());
+      if (params?.searchTerm)
+        queryParams.append("SearchTerm", params.searchTerm);
+      if (params?.role) queryParams.append("Role", params.role);
+      if (params?.sortBy) queryParams.append("SortBy", params.sortBy);
+      if (params?.sortDescending !== undefined)
+        queryParams.append("SortDescending", params.sortDescending.toString());
 
-      const url = `${API_BASE_URL}/admin/users${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const url = `${API_BASE_URL}/admin/users${queryParams.toString() ? "?" + queryParams.toString() : ""}`;
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh sách người dùng (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy danh sách người dùng (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -536,19 +582,25 @@ export const adminService = {
   async getUser(userId: number): Promise<ApiResponse<AdminUserDto>> {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy thông tin người dùng (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy thông tin người dùng (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -558,7 +610,7 @@ export const adminService = {
   ): Promise<ApiResponse<AdminUserDto | number | string | null>> {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/user`, {
-        method: 'POST',
+        method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
@@ -577,28 +629,37 @@ export const adminService = {
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Update user
-  async updateUser(userId: number, updateData: UpdateUserDto): Promise<ApiResponse<AdminUserDto>> {
+  async updateUser(
+    userId: number,
+    updateData: UpdateUserDto,
+  ): Promise<ApiResponse<AdminUserDto>> {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi cập nhật người dùng (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi cập nhật người dùng (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -606,44 +667,59 @@ export const adminService = {
   async deleteUser(userId: number): Promise<ApiResponse<void>> {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || 'Lỗi xóa người dùng' };
+        return {
+          success: false,
+          error: data?.message || data?.detail || "Lỗi xóa người dùng",
+        };
       }
 
       return { success: true };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Update user role
-  async updateUserRole(userId: number, role: string): Promise<ApiResponse<AdminUserDto>> {
+  async updateUserRole(
+    userId: number,
+    role: string,
+  ): Promise<ApiResponse<AdminUserDto>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/role`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ role } as UpdateUserRoleDto),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/admin/users/${userId}/role`,
+        {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ role } as UpdateUserRoleDto),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi cập nhật quyền (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi cập nhật quyền (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // ==================== CHAT SESSIONS ====================
-  
+
   // Get chat sessions with pagination
   async getChatSessions(params?: {
     pageNumber?: number;
@@ -656,58 +732,79 @@ export const adminService = {
   }): Promise<ApiResponse<AdminChatSessionDtoPagedResult>> {
     try {
       const queryParams = new URLSearchParams();
-      if (params?.pageNumber) queryParams.append('PageNumber', params.pageNumber.toString());
-      if (params?.pageSize) queryParams.append('PageSize', params.pageSize.toString());
-      if (params?.userId) queryParams.append('UserId', params.userId.toString());
-      if (params?.startDate) queryParams.append('StartDate', params.startDate);
-      if (params?.endDate) queryParams.append('EndDate', params.endDate);
-      if (params?.sortBy) queryParams.append('SortBy', params.sortBy);
-      if (params?.sortDescending !== undefined) queryParams.append('SortDescending', params.sortDescending.toString());
+      if (params?.pageNumber)
+        queryParams.append("PageNumber", params.pageNumber.toString());
+      if (params?.pageSize)
+        queryParams.append("PageSize", params.pageSize.toString());
+      if (params?.userId)
+        queryParams.append("UserId", params.userId.toString());
+      if (params?.startDate) queryParams.append("StartDate", params.startDate);
+      if (params?.endDate) queryParams.append("EndDate", params.endDate);
+      if (params?.sortBy) queryParams.append("SortBy", params.sortBy);
+      if (params?.sortDescending !== undefined)
+        queryParams.append("SortDescending", params.sortDescending.toString());
 
-      const url = `${API_BASE_URL}/admin/chat-sessions${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const url = `${API_BASE_URL}/admin/chat-sessions${queryParams.toString() ? "?" + queryParams.toString() : ""}`;
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh sách phiên chat (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy danh sách phiên chat (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data: normalizeAdminChatSessionsPaged(data) };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Get single chat session
-  async getChatSession(sessionId: number): Promise<ApiResponse<AdminChatSessionDto>> {
+  async getChatSession(
+    sessionId: number,
+  ): Promise<ApiResponse<AdminChatSessionDto>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/chat-sessions/${sessionId}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/admin/chat-sessions/${sessionId}`,
+        {
+          method: "GET",
+          headers: getAuthHeaders(),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy thông tin phiên chat (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy thông tin phiên chat (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Delete chat session
-  async deleteChatSession(sessionIdOrId: string | number): Promise<ApiResponse<void>> {
+  async deleteChatSession(
+    sessionIdOrId: string | number,
+  ): Promise<ApiResponse<void>> {
     try {
-      const candidates = [
-        String(sessionIdOrId),
-      ];
+      const candidates = [String(sessionIdOrId)];
 
       const asNumber = Number(sessionIdOrId);
       if (Number.isFinite(asNumber)) {
@@ -717,13 +814,13 @@ export const adminService = {
         }
       }
 
-      let lastError = 'Lỗi xóa phiên chat';
+      let lastError = "Lỗi xóa phiên chat";
 
       for (const candidate of candidates) {
         const response = await fetch(
           `${API_BASE_URL}/admin/chat-sessions/${encodeURIComponent(candidate)}`,
           {
-            method: 'DELETE',
+            method: "DELETE",
             headers: getAuthHeaders(),
           },
         );
@@ -733,12 +830,15 @@ export const adminService = {
         }
 
         const data = await safeJsonParse(response);
-        lastError = data?.message || data?.detail || `Lỗi xóa phiên chat (HTTP ${response.status})`;
+        lastError =
+          data?.message ||
+          data?.detail ||
+          `Lỗi xóa phiên chat (HTTP ${response.status})`;
       }
 
       return { success: false, error: lastError };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -750,11 +850,11 @@ export const adminService = {
         `${API_BASE_URL}/admin/chat-sessions/user/${userId}`,
       ];
 
-      let lastError = 'Lỗi xóa phiên chat';
+      let lastError = "Lỗi xóa phiên chat";
 
       for (const url of deleteUrls) {
         const response = await fetch(url, {
-          method: 'DELETE',
+          method: "DELETE",
           headers: getAuthHeaders(),
         });
 
@@ -763,12 +863,15 @@ export const adminService = {
         }
 
         const data = await safeJsonParse(response);
-        lastError = data?.message || data?.detail || `Lỗi xóa phiên chat (HTTP ${response.status})`;
+        lastError =
+          data?.message ||
+          data?.detail ||
+          `Lỗi xóa phiên chat (HTTP ${response.status})`;
       }
 
       return { success: false, error: lastError };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -778,39 +881,56 @@ export const adminService = {
   async getCategories(): Promise<ApiResponse<CategoryDto[]>> {
     try {
       const response = await fetch(`${API_BASE_URL}/Category`, {
-        method: 'GET',
+        method: "GET",
         headers: getPublicHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh mục (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy danh mục (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data: Array.isArray(data) ? data : [] };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Get public landing categories
-  async getLandingCategories(limit: number = 10): Promise<ApiResponse<CategoryListDto[]>> {
+  async getLandingCategories(
+    limit: number = 10,
+  ): Promise<ApiResponse<CategoryListDto[]>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/Category/landing?limit=${limit}`, {
-        method: 'GET',
-        headers: getPublicHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/Category/landing?limit=${limit}`,
+        {
+          method: "GET",
+          headers: getPublicHeaders(),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh mục landing (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy danh mục landing (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data: Array.isArray(data) ? data : [] };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -818,23 +938,29 @@ export const adminService = {
   async getDetail(detailId: string): Promise<ApiResponse<DetailDto>> {
     try {
       const response = await fetch(`${API_BASE_URL}/Detail/${detailId}`, {
-        method: 'GET',
+        method: "GET",
         headers: getPublicHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy chi tiết danh nhân (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy chi tiết danh nhân (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       if (!data) {
-        return { success: false, error: 'Không có dữ liệu chi tiết danh nhân' };
+        return { success: false, error: "Không có dữ liệu chi tiết danh nhân" };
       }
 
       return { success: true, data: sanitizeDetailDto(data as DetailDto) };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -843,22 +969,22 @@ export const adminService = {
     payload: WikipediaPersonSummaryRequestDto,
   ): Promise<ApiResponse<WikipediaSearchResultDto[]>> {
     try {
-      const keyword = (payload.entityName || '').trim();
+      const keyword = (payload.entityName || "").trim();
       if (!keyword) {
-        return { success: false, error: 'Tên danh nhân không được để trống' };
+        return { success: false, error: "Tên danh nhân không được để trống" };
       }
 
-      const language = payload.language || 'vi';
+      const language = payload.language || "vi";
       const query = new URLSearchParams({
         keyword,
         language,
-        limit: '5',
+        limit: "5",
       });
 
       const response = await fetch(
         `${API_BASE_URL}/Document/search-from-wikipedia?${query.toString()}`,
         {
-          method: 'GET',
+          method: "GET",
           headers: getPublicHeaders(),
         },
       );
@@ -870,27 +996,27 @@ export const adminService = {
         return {
           success: false,
           error:
-            (typeof record?.message === 'string' ? record.message : null) ||
+            (typeof record?.message === "string" ? record.message : null) ||
             `Lỗi lấy chi tiết danh nhân (HTTP ${response.status})`,
         };
       }
 
       const items = Array.isArray(rawData) ? rawData : [];
       if (items.length === 0) {
-        return { success: false, error: 'Không có dữ liệu chi tiết danh nhân' };
+        return { success: false, error: "Không có dữ liệu chi tiết danh nhân" };
       }
 
       const pickString = (...values: unknown[]): string | null => {
         for (const value of values) {
-          if (typeof value === 'string' && value.trim()) return value.trim();
+          if (typeof value === "string" && value.trim()) return value.trim();
         }
         return null;
       };
 
       const pickNumber = (...values: unknown[]): number | null => {
         for (const value of values) {
-          if (typeof value === 'number' && Number.isFinite(value)) return value;
-          if (typeof value === 'string' && value.trim()) {
+          if (typeof value === "number" && Number.isFinite(value)) return value;
+          if (typeof value === "string" && value.trim()) {
             const parsed = Number(value);
             if (Number.isFinite(parsed)) return parsed;
           }
@@ -902,26 +1028,34 @@ export const adminService = {
         .map((item, index) => {
           const source = item as Record<string, unknown>;
           const title = normalizeEntityTitle(pickString(source.title));
-          const wikipediaUrl = pickString(source.pageUrl, source.wikipediaUrl, source.url, source.sourceUrl);
+          const wikipediaUrl = pickString(
+            source.pageUrl,
+            source.wikipediaUrl,
+            source.url,
+            source.sourceUrl,
+          );
           const thumbnailUrl = pickString(
             source.thumbnailUrl,
             source.thumbnail,
             source.thumbnail_url,
             (source.thumbnail as Record<string, unknown> | undefined)?.source,
-            (source.originalimage as Record<string, unknown> | undefined)?.source,
+            (source.originalimage as Record<string, unknown> | undefined)
+              ?.source,
             source.imageUrl,
           );
 
           const pageId = pickNumber(source.pageId, source.pageid, source.id);
-          const stableId = pageId !== null ? `wiki-${pageId}` : `wiki-${keyword}-${index}`;
+          const stableId =
+            pageId !== null ? `wiki-${pageId}` : `wiki-${keyword}-${index}`;
 
           const mapped: WikipediaSearchResultDto = {
             id: stableId,
             pageId,
             title: (title as string | null) || null,
             content:
-              (sanitizeEscapedText(pickString(source.extract, source.description, source.summary)) as string | null) ||
-              null,
+              (sanitizeEscapedText(
+                pickString(source.extract, source.description, source.summary),
+              ) as string | null) || null,
             description: null,
             wikipediaUrl,
             thumbnailUrl,
@@ -932,36 +1066,52 @@ export const adminService = {
 
           return mapped;
         })
-        .filter((item) => Boolean(item.title || item.content || item.wikipediaUrl));
+        .filter((item) =>
+          Boolean(item.title || item.content || item.wikipediaUrl),
+        );
 
       if (mappedDetails.length === 0) {
-        return { success: false, error: 'Không có dữ liệu chi tiết danh nhân' };
+        return { success: false, error: "Không có dữ liệu chi tiết danh nhân" };
       }
 
       return { success: true, data: mappedDetails };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Get details by category id
-  async getDetailsByCategory(categoryId: string): Promise<ApiResponse<DetailDto[]>> {
+  async getDetailsByCategory(
+    categoryId: string,
+  ): Promise<ApiResponse<DetailDto[]>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/Detail/category/${categoryId}`, {
-        method: 'GET',
-        headers: getPublicHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/Detail/category/${categoryId}`,
+        {
+          method: "GET",
+          headers: getPublicHeaders(),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh sách danh nhân (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy danh sách danh nhân (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       const list = Array.isArray(data) ? data : [];
-      return { success: true, data: list.map((detail) => sanitizeDetailDto(detail as DetailDto)) };
+      return {
+        success: true,
+        data: list.map((detail) => sanitizeDetailDto(detail as DetailDto)),
+      };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -971,79 +1121,114 @@ export const adminService = {
   async getAdminCategories(): Promise<ApiResponse<CategoryDto[]>> {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/categories`, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh mục admin (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy danh mục admin (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data: Array.isArray(data) ? data : [] };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Create admin category
-  async createAdminCategory(payload: CreateCategoryDto): Promise<ApiResponse<string>> {
+  async createAdminCategory(
+    payload: CreateCategoryDto,
+  ): Promise<ApiResponse<string>> {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/categories`, {
-        method: 'POST',
+        method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi tạo danh mục (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi tạo danh mục (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Update admin category
-  async updateAdminCategory(categoryId: string, payload: UpdateCategoryDto): Promise<ApiResponse<void>> {
+  async updateAdminCategory(
+    categoryId: string,
+    payload: UpdateCategoryDto,
+  ): Promise<ApiResponse<void>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/categories/${categoryId}`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/admin/categories/${categoryId}`,
+        {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi cập nhật danh mục (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi cập nhật danh mục (HTTP ${response.status})`,
+        };
       }
 
       return { success: true };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Delete admin category
   async deleteAdminCategory(categoryId: string): Promise<ApiResponse<void>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/categories/${categoryId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/admin/categories/${categoryId}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi xóa danh mục (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi xóa danh mục (HTTP ${response.status})`,
+        };
       }
 
       return { success: true };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -1060,72 +1245,103 @@ export const adminService = {
   }): Promise<ApiResponse<DetailDtoPagedResult>> {
     try {
       const queryParams = new URLSearchParams();
-      if (params?.pageNumber) queryParams.append('PageNumber', params.pageNumber.toString());
-      if (params?.pageSize) queryParams.append('PageSize', params.pageSize.toString());
-      if (params?.categoryId && params.categoryId !== 'all') queryParams.append('CategoryId', params.categoryId);
-      if (params?.searchTerm) queryParams.append('SearchTerm', params.searchTerm);
-      if (params?.sortBy) queryParams.append('SortBy', params.sortBy);
-      if (params?.sortDescending !== undefined) queryParams.append('SortDescending', params.sortDescending.toString());
+      if (params?.pageNumber)
+        queryParams.append("PageNumber", params.pageNumber.toString());
+      if (params?.pageSize)
+        queryParams.append("PageSize", params.pageSize.toString());
+      if (params?.categoryId && params.categoryId !== "all")
+        queryParams.append("CategoryId", params.categoryId);
+      if (params?.searchTerm)
+        queryParams.append("SearchTerm", params.searchTerm);
+      if (params?.sortBy) queryParams.append("SortBy", params.sortBy);
+      if (params?.sortDescending !== undefined)
+        queryParams.append("SortDescending", params.sortDescending.toString());
 
-      const url = `${API_BASE_URL}/admin/details${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const url = `${API_BASE_URL}/admin/details${queryParams.toString() ? "?" + queryParams.toString() : ""}`;
 
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh nhân admin (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy danh nhân admin (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data: normalizeAdminDetailsPaged(data) };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Create admin detail
-  async createAdminDetail(payload: CreateDetailDto): Promise<ApiResponse<string>> {
+  async createAdminDetail(
+    payload: CreateDetailDto,
+  ): Promise<ApiResponse<string>> {
     try {
       const cleanedPayload = sanitizeDetailPayload(payload);
       const response = await fetch(`${API_BASE_URL}/admin/details`, {
-        method: 'POST',
+        method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(cleanedPayload),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi tạo danh nhân (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi tạo danh nhân (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Update admin detail
-  async updateAdminDetail(detailId: string, payload: UpdateDetailDto): Promise<ApiResponse<void>> {
+  async updateAdminDetail(
+    detailId: string,
+    payload: UpdateDetailDto,
+  ): Promise<ApiResponse<void>> {
     try {
       const cleanedPayload = sanitizeDetailPayload(payload);
-      const response = await fetch(`${API_BASE_URL}/admin/details/${detailId}`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(cleanedPayload),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/admin/details/${detailId}`,
+        {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(cleanedPayload),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi cập nhật danh nhân (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi cập nhật danh nhân (HTTP ${response.status})`,
+        };
       }
 
       return { success: true };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -1134,11 +1350,14 @@ export const adminService = {
     payload: WikipediaGenerateNodeRequestDto,
   ): Promise<ApiResponse<WikipediaGenerateNodeResponseDto>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/wikipedia/generate-node`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/admin/wikipedia/generate-node`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        },
+      );
 
       const data = await safeJsonParse(response);
 
@@ -1154,7 +1373,7 @@ export const adminService = {
 
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -1164,7 +1383,7 @@ export const adminService = {
   ): Promise<ApiResponse<WikipediaDocumentResponseDto>> {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/wikipedia/chunking`, {
-        method: 'POST',
+        method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
@@ -1183,7 +1402,7 @@ export const adminService = {
 
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -1192,10 +1411,13 @@ export const adminService = {
     jobId: string,
   ): Promise<ApiResponse<GraphRagNodeStatusResponseDto>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/graphrag/node-status/${jobId}`, {
-        method: 'GET',
-        headers: getPublicHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/graphrag/node-status/${jobId}`,
+        {
+          method: "GET",
+          headers: getPublicHeaders(),
+        },
+      );
 
       const data = await safeJsonParse(response);
 
@@ -1211,7 +1433,7 @@ export const adminService = {
 
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -1220,10 +1442,13 @@ export const adminService = {
     jobId: string,
   ): Promise<ApiResponse<WikipediaChunkStatusResponseDto>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/wikipedia/chunk-status/${jobId}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/admin/wikipedia/chunk-status/${jobId}`,
+        {
+          method: "GET",
+          headers: getAuthHeaders(),
+        },
+      );
 
       const data = await safeJsonParse(response);
 
@@ -1239,26 +1464,35 @@ export const adminService = {
 
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Delete admin detail
   async deleteAdminDetail(detailId: string): Promise<ApiResponse<void>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/details/${detailId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/admin/details/${detailId}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi xóa danh nhân (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi xóa danh nhân (HTTP ${response.status})`,
+        };
       }
 
       return { success: true };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -1267,15 +1501,18 @@ export const adminService = {
     payload: WikipediaUpdateFromDetailRequestDto,
   ): Promise<ApiResponse<WikipediaUpdateFromDetailResponseDto>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/Document/update-from-wikipedia`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          categoryId: payload.categoryId,
-          pageTitle: payload.pageTitle,
-          language: payload.language || 'vi',
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/Document/update-from-wikipedia`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            categoryId: payload.categoryId,
+            pageTitle: payload.pageTitle,
+            language: payload.language || "vi",
+          }),
+        },
+      );
 
       const data = await safeJsonParse(response);
 
@@ -1291,102 +1528,142 @@ export const adminService = {
 
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // ==================== DOCUMENTS ====================
-  
+
   // Get documents list
-  async getDocuments(skip: number = 0, limit: number = 100): Promise<ApiResponse<DocumentInfo[]>> {
+  async getDocuments(
+    skip: number = 0,
+    limit: number = 100,
+  ): Promise<ApiResponse<DocumentInfo[]>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/Question/documents?skip=${skip}&limit=${limit}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/Question/documents?skip=${skip}&limit=${limit}`,
+        {
+          method: "GET",
+          headers: getAuthHeaders(),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy danh sách tài liệu (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy danh sách tài liệu (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Get single document
   async getDocument(documentId: string): Promise<ApiResponse<DocumentInfo>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/Question/documents/${documentId}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/Question/documents/${documentId}`,
+        {
+          method: "GET",
+          headers: getAuthHeaders(),
+        },
+      );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy thông tin tài liệu (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy thông tin tài liệu (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // Delete document
   async deleteDocument(documentId: string): Promise<ApiResponse<void>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/Question/documents/${documentId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || 'Lỗi xóa tài liệu' };
-      }
-
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
-    }
-  },
-
-  // Upload document
-  async uploadDocument(file: File, chunkSize: number = 800, chunkOverlap: number = 150): Promise<ApiResponse<DocumentUploadResponse>> {
-    try {
-      const token = authService.getToken();
-      if (!token) {
-        return { success: false, error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' };
-      }
-
-      const formData = new FormData();
-      formData.append('file', file);
-
       const response = await fetch(
-        `${API_BASE_URL}/Question/upload?chunkSize=${chunkSize}&chunkOverlap=${chunkOverlap}`,
+        `${API_BASE_URL}/Question/documents/${documentId}`,
         {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        }
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        },
       );
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi upload tài liệu (HTTP ${response.status})` };
+        return {
+          success: false,
+          error: data?.message || data?.detail || "Lỗi xóa tài liệu",
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: "Lỗi kết nối server" };
+    }
+  },
+
+  // Upload document
+  async uploadDocument(
+    file: File,
+    chunkSize: number = 800,
+    chunkOverlap: number = 150,
+  ): Promise<ApiResponse<DocumentUploadResponse>> {
+    try {
+      const token = authService.getToken();
+      if (!token) {
+        return {
+          success: false,
+          error: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+        };
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(
+        `${API_BASE_URL}/Question/upload?chunkSize=${chunkSize}&chunkOverlap=${chunkOverlap}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        const data = await safeJsonParse(response);
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi upload tài liệu (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -1394,39 +1671,45 @@ export const adminService = {
   async getJobStatus(jobId: string): Promise<ApiResponse<JobStatusResponse>> {
     try {
       const response = await fetch(`${API_BASE_URL}/Question/status/${jobId}`, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
         const data = await safeJsonParse(response);
-        return { success: false, error: data?.message || data?.detail || `Lỗi lấy trạng thái (HTTP ${response.status})` };
+        return {
+          success: false,
+          error:
+            data?.message ||
+            data?.detail ||
+            `Lỗi lấy trạng thái (HTTP ${response.status})`,
+        };
       }
 
       const data = await safeJsonParse(response);
       return { success: true, data };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
   // ==================== HEALTH ====================
-  
+
   // Check admin health
   async checkHealth(): Promise<ApiResponse<void>> {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/health`, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
-        return { success: false, error: 'Admin service không hoạt động' };
+        return { success: false, error: "Admin service không hoạt động" };
       }
 
       return { success: true };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 
@@ -1434,17 +1717,17 @@ export const adminService = {
   async checkQuestionHealth(): Promise<ApiResponse<void>> {
     try {
       const response = await fetch(`${API_BASE_URL}/Question/health`, {
-        method: 'GET',
+        method: "GET",
         headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
-        return { success: false, error: 'Question service không hoạt động' };
+        return { success: false, error: "Question service không hoạt động" };
       }
 
       return { success: true };
     } catch (error) {
-      return { success: false, error: 'Lỗi kết nối server' };
+      return { success: false, error: "Lỗi kết nối server" };
     }
   },
 };
