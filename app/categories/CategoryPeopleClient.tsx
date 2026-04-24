@@ -10,6 +10,16 @@ const trimText = (value: string, maxLength: number) => {
   return `${value.slice(0, maxLength).trim()}...`;
 };
 
+const stripHtmlTags = (value: string) =>
+  value
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const normalizeEntityName = (value: string) =>
   value
     .trim()
@@ -145,7 +155,7 @@ export default function CategoryPeopleClient() {
                 Quay lại danh mục
               </Link>
 
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-slate-900 tracking-tight leading-[1.05]">
+              <h1 className="text-3xl sm:text-4xl md:text-4xl font-serif font-bold text-slate-900 tracking-tight leading-[1.05]">
                 {categoryName}
               </h1>
             </div>
@@ -222,32 +232,49 @@ export default function CategoryPeopleClient() {
                   const personTitle = normalizeEntityName(
                     person.title || "Đang cập nhật",
                   );
-                  const description = trimText(
-                    (
-                      person.content || "Dữ liệu tiểu sử đang được cập nhật."
-                    ).trim(),
-                    220,
-                  );
+                  const previewSource =
+                    person.description?.trim() ||
+                    stripHtmlTags(person.content || "") ||
+                    "Dữ liệu tiểu sử đang được cập nhật.";
+                  const description = trimText(previewSource, 500);
+                  const thumbnailUrl = person.thumbnailUrl?.trim() || "";
 
                   return (
                     <article
                       key={person.id}
-                      className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 shadow-sm"
+                      className="relative flex flex-col justify-between bg-white/60 border border-gray-300 p-3"
                     >
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-3">
-                        Danh nhân
-                      </p>
-                      <h2 className="text-2xl font-serif font-bold text-slate-900 mb-3 leading-tight">
-                        {personTitle}
-                      </h2>
-                      <p className="text-slate-600 leading-relaxed mb-6 whitespace-pre-line">
-                        {description}
-                      </p>
-                      <Link
-                        href={`/categories/detail?id=${encodeURIComponent(person.id)}`}
-                        className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
-                      >
-                        Thông tin chi tiết
+                      <div>
+                        <div className="float-right ml-2 flex items-center justify-center overflow-hidden">
+                          {thumbnailUrl ? (
+                            <img
+                              src={thumbnailUrl}
+                              alt={personTitle}
+                              className="w-[140px]"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="flex h-[200px] w-[140px] bg-gray-200 items-center justify-center px-3 text-xs text-slate-500">
+                              Không có ảnh
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <h2 className="text-[1.3rem] font-serif font-bold text-slate-900 mb-3 leading-tight">
+                            {personTitle}
+                          </h2>
+                          <p className="text-slate-600 leading-relaxed mb-6">
+                            {description}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="inline-flex items-center gap-2 cursor-default text-blue-500">
+                        <Link
+                          className=" text-sm hover:underline transition-all duration-200 cursor-pointer"
+                          href={`/categories/detail?id=${encodeURIComponent(person.id)}`}
+                        >
+                          Xem thêm thông tin chi tiết
+                        </Link>
                         <svg
                           className="w-4 h-4"
                           fill="none"
@@ -261,7 +288,7 @@ export default function CategoryPeopleClient() {
                             d="M17 8l4 4m0 0l-4 4m4-4H3"
                           />
                         </svg>
-                      </Link>
+                      </div>
                     </article>
                   );
                 })}
