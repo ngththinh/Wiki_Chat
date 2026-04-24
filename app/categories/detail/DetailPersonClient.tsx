@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import parse, {
+  DOMNode,
+  domToReact,
+  Element,
+  HTMLReactParserOptions,
+} from "html-react-parser";
 import adminService, { DetailDto } from "@/lib/adminService";
 
 const normalizeEntityName = (value: string) =>
@@ -13,7 +19,40 @@ const normalizeEntityName = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const sanitizeHtmlContent = (html: string) =>
+  html
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/\son\w+=("[^"]*"|'[^']*')/gi, "")
+    .replace(/\sjavascript:/gi, "");
+
+const normalizeForCompare = (value: string) =>
+  normalizeEntityName(value)
+    .toLocaleLowerCase("vi-VN")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
+const stripLeadingDuplicateHeading = (html: string, personName: string) => {
+  const personKey = normalizeForCompare(personName);
+  if (!personKey) return html;
+
+  const headingPattern = /^\s*<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>\s*/i;
+  const match = html.match(headingPattern);
+  if (!match) return html;
+
+  const headingText = match[1]
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (normalizeForCompare(headingText) !== personKey) return html;
+
+  return html.replace(headingPattern, "");
+};
+
 export default function DetailPersonClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const detailId = useMemo(() => {
@@ -85,150 +124,174 @@ export default function DetailPersonClient() {
   const categoryHref = resolvedCategoryId
     ? `/categories/${encodeURIComponent(resolvedCategoryId)}`
     : "/#categories";
-  const personContent = detail?.content?.trim() || "";
+  const personContent =
+    detail?.content?.trim() || detail?.description?.trim() || "";
+  const renderedPersonContent = useMemo(() => {
+    if (!personContent) return "";
+
+    const hasHtmlTags = /<\/?[a-z][\s\S]*>/i.test(personContent);
+    const normalizedContent = hasHtmlTags
+      ? personContent
+      : personContent.replace(/\n/g, "<br />");
+
+    const sanitized = sanitizeHtmlContent(normalizedContent);
+    return stripLeadingDuplicateHeading(sanitized, personName);
+  }, [personContent, personName]);
+  const parserOptions: HTMLReactParserOptions = useMemo(() => {
+    const options: HTMLReactParserOptions = {
+      replace: (domNode) => {
+        if (!(domNode instanceof Element) || domNode.name !== "a") {
+          return;
+        }
+
+        const href = domNode.attribs?.href || "#";
+        const isExternalLink = /^https?:\/\//i.test(href);
+        const existingClass = domNode.attribs?.class || "";
+        const mergedClass = [existingClass, "wiki-inline-link", "text-blue-600"]
+          .filter(Boolean)
+          .join(" ");
+
+        return (
+          <a
+            {...domNode.attribs}
+            href={href}
+            className={mergedClass}
+            target={isExternalLink ? "_blank" : undefined}
+            rel={isExternalLink ? "noreferrer" : undefined}
+          >
+            {domToReact(domNode.children as unknown as DOMNode[], options)}
+          </a>
+        );
+      },
+    };
+
+    return options;
+  }, []);
+  const parsedPersonContent = useMemo(() => {
+    if (!renderedPersonContent) return null;
+    return parse(renderedPersonContent, parserOptions);
+  }, [renderedPersonContent, parserOptions]);
+  const hasEmbeddedInfobox = useMemo(
+    () =>
+      /<(table|div)[^>]*class=["'][^"']*\binfobox\b/i.test(
+        renderedPersonContent,
+      ),
+    [renderedPersonContent],
+  );
   const wikipediaUrl = detail?.wikipediaUrl?.trim() || "";
+  const thumbnailUrl = detail?.thumbnailUrl?.trim() || "";
+  const createdDate = detail?.createdAt
+    ? new Date(detail.createdAt).toLocaleDateString("vi-VN")
+    : "Không rõ";
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(165deg, #FDFCFB 0%, #FAF9F7 25%, #F5F5F4 50%, #F1F5F9 80%, #E2E8F0 100%)",
-        }}
-      />
+    <main className="wiki-detail-page min-h-screen">
+      <div className="wiki-detail-shell mx-auto max-w-[1280px] px-3 sm:px-5 py-6 sm:py-8">
+        <header className="wiki-top-header">
+          <h1 className="wiki-main-title">{personName}</h1>
+          <div className="wiki-top-actions">
+            <button
+              type="button"
+              className="wiki-top-link"
+              onClick={() => {
+                if (window.history.length > 1) {
+                  router.back();
+                  return;
+                }
 
-      <div
-        className="absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, #475569 1px, transparent 1px),
-            linear-gradient(to bottom, #475569 1px, transparent 1px)
-          `,
-          backgroundSize: "60px 60px",
-        }}
-      />
-
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10 sm:mb-14">
-          <div>
-            {isLoading ? (
-              <div className="animate-pulse space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-px w-12 bg-slate-300" />
-                  <div className="h-3 w-36 rounded bg-slate-200/80" />
-                </div>
-                <div className="h-12 w-72 rounded-lg bg-slate-200/80 sm:h-14 sm:w-96" />
-                <div className="h-6 w-64 rounded-lg bg-slate-200/70" />
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-px bg-slate-300" />
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-[0.2em]">
-                    Hồ sơ danh nhân
-                  </p>
-                </div>
-                <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-slate-900 tracking-tight leading-[1.05]">
-                  {personName}
-                </h1>
-                <p className="text-slate-500 mt-4 text-base sm:text-lg">
-                  Thuộc lĩnh vực: {resolvedCategoryName}
-                </p>
-              </>
-            )}
-          </div>
-
-          <Link
-            href={categoryHref}
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+                router.push(categoryHref);
+              }}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Quay lại danh mục
-          </Link>
-        </div>
+              Quay lại trang trước
+            </button>
+          </div>
+        </header>
+
+        <nav className="wiki-tabs" aria-label="Điều hướng bài viết">
+          <span className="wiki-tab wiki-tab-active">Bài viết</span>
+        </nav>
 
         {isLoading ? (
-          <div className="space-y-6 animate-pulse">
-            <div className="space-y-3">
-              <div className="h-11 w-2/3 rounded-lg bg-slate-200/80" />
-              <div className="h-6 w-1/3 rounded-lg bg-slate-200/70" />
-            </div>
-
-            <section className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 sm:p-8 shadow-sm">
-              <div className="mb-6 flex items-center gap-3">
-                <div className="h-7 w-32 rounded-lg bg-slate-200/80" />
-                <div className="h-5 w-28 rounded-lg bg-slate-200/70" />
-              </div>
-
-              <div className="mb-4 h-9 w-2/5 rounded-lg bg-slate-200/80" />
-              <div className="mb-3 h-5 w-3/4 rounded-lg bg-slate-200/70" />
-
-              <div className="space-y-2">
-                <div className="h-4 w-full rounded bg-slate-200/70" />
-                <div className="h-4 w-full rounded bg-slate-200/70" />
-                <div className="h-4 w-11/12 rounded bg-slate-200/70" />
-                <div className="h-4 w-10/12 rounded bg-slate-200/70" />
-                <div className="h-4 w-8/12 rounded bg-slate-200/70" />
-              </div>
-            </section>
+          <div className="animate-pulse py-8 space-y-3">
+            <div className="h-8 w-72 bg-slate-200" />
+            <div className="h-4 w-full bg-slate-200" />
+            <div className="h-4 w-[92%] bg-slate-200" />
+            <div className="h-4 w-[86%] bg-slate-200" />
           </div>
         ) : !detail ? (
-          <div className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm px-6 py-14 text-center">
-            <p className="text-slate-700 text-lg font-serif mb-2">
-              Không tìm thấy danh nhân
-            </p>
-            <p className="text-slate-500 text-sm">
+          <section className="wiki-article-wrap py-12 text-center">
+            <p className="wiki-not-found-title">Không tìm thấy danh nhân</p>
+            <p className="wiki-not-found-desc">
               Dữ liệu chi tiết có thể đã bị thay đổi hoặc chưa sẵn sàng.
             </p>
-          </div>
+          </section>
         ) : (
-          <section className="rounded-2xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6 sm:p-8 shadow-sm">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium border bg-slate-50 text-slate-600 border-slate-200 uppercase tracking-wide">
-                {resolvedCategoryName}
-              </span>
-              <span className="text-xs text-slate-400">
-                Ngày tạo{" "}
-                {new Date(detail.createdAt).toLocaleDateString("vi-VN")}
-              </span>
-            </div>
-
-            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-slate-900 mb-4 leading-tight">
-              {personName}
-            </h2>
-
-            {wikipediaUrl && (
-              <p className="text-sm text-slate-600 break-all mb-6">
-                Xem thêm ở Wiki:{" "}
-                <a
-                  href={wikipediaUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-blue-600 hover:text-blue-700 underline underline-offset-2"
+          <section className="wiki-content-grid">
+            <article className="wiki-article-wrap">
+              {!hasEmbeddedInfobox && (
+                <aside
+                  className="wiki-infobox"
+                  aria-label="Thông tin danh nhân"
                 >
-                  {wikipediaUrl}
-                </a>
-              </p>
-            )}
+                  <div className="wiki-infobox-title">{personName}</div>
 
-            {personContent && (
-              <p className="text-slate-700 leading-relaxed whitespace-pre-line text-base sm:text-lg mb-8">
-                {personContent}
+                  {thumbnailUrl ? (
+                    <img
+                      src={thumbnailUrl}
+                      alt={personName}
+                      className="wiki-infobox-image"
+                    />
+                  ) : (
+                    <div className="wiki-infobox-image-placeholder">
+                      Chưa có ảnh
+                    </div>
+                  )}
+
+                  <dl className="wiki-infobox-list">
+                    <div className="wiki-infobox-row">
+                      <dt>Danh mục</dt>
+                      <dd>{resolvedCategoryName}</dd>
+                    </div>
+                    <div className="wiki-infobox-row">
+                      <dt>Ngày tạo</dt>
+                      <dd>{createdDate}</dd>
+                    </div>
+                    <div className="wiki-infobox-row">
+                      <dt>Mã chi tiết</dt>
+                      <dd className="wiki-mono">{detail.id}</dd>
+                    </div>
+                  </dl>
+                </aside>
+              )}
+
+              <p className="wiki-lead-line">
+                <strong>{personName}</strong> là một nhân vật thuộc danh mục{" "}
+                <Link href={categoryHref} className="wiki-inline-link">
+                  {resolvedCategoryName}
+                </Link>
+                .
               </p>
-            )}
+
+              {wikipediaUrl && (
+                <p className="wiki-source-line">
+                  Nguồn tham khảo:{" "}
+                  <a
+                    href={wikipediaUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="wiki-inline-link"
+                  >
+                    {wikipediaUrl}
+                  </a>
+                </p>
+              )}
+
+              {parsedPersonContent && (
+                <div className="detail-html-content wiki-detail-content">
+                  {parsedPersonContent}
+                </div>
+              )}
+            </article>
           </section>
         )}
       </div>
