@@ -422,12 +422,12 @@ function HeroSection() {
       </div>
 
       {/* Bottom decorative element - hidden on small mobile */}
-      <div className="absolute bottom-8 sm:bottom-16 left-1/2 -translate-x-1/2 hidden sm:flex flex-col items-center gap-4">
+      {/* <div className="absolute bottom-8 sm:bottom-16 left-1/2 -translate-x-1/2 hidden sm:flex flex-col items-center gap-4">
         <span className="text-[10px] text-slate-400 uppercase tracking-[0.2em]">
           Cuộn xuống
         </span>
         <div className="w-px h-12 bg-gradient-to-b from-slate-300 to-transparent"></div>
-      </div>
+      </div> */}
     </section>
   );
 }
