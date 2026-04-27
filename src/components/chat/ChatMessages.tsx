@@ -231,11 +231,11 @@ function MessageBubble({ message }: { message: Message }) {
         }`}
       >
         <p
-          className={`text-sm leading-relaxed ${
+          className={`text-sm leading-relaxed whitespace-pre-wrap ${
             isUser ? "text-white/90" : "text-slate-700"
           }`}
         >
-          {message.content}
+          {message.content.replace(/\\n/g, "\n")}
         </p>
         <div
           className={`flex items-center gap-2 mt-3 pt-3 border-t ${
