@@ -67,11 +67,10 @@ function validateRegisterForm(data: RegisterFormData): ValidationErrors {
     errors.email = "Email không hợp lệ";
   }
 
-  // Full name validation (optional)
-  if (
-    normalizedData.fullName &&
-    !FULL_NAME_REGEX.test(normalizedData.fullName)
-  ) {
+  // Full name validation
+  if (!normalizedData.fullName) {
+    errors.fullName = "Vui lòng nhập họ và tên";
+  } else if (!FULL_NAME_REGEX.test(normalizedData.fullName)) {
     errors.fullName =
       "Họ tên chỉ gồm chữ cái và khoảng trắng hợp lệ, độ dài 2-100 ký tự";
   }
@@ -211,7 +210,7 @@ export default function RegisterScreen() {
         username: normalizedData.username,
         password: normalizedData.password,
         email: normalizedData.email,
-        fullName: normalizedData.fullName || undefined,
+        fullName: normalizedData.fullName,
       };
 
       const response = await authService.register(registerData);
@@ -369,11 +368,12 @@ export default function RegisterScreen() {
                     label="Họ và tên"
                     type="text"
                     name="fullName"
-                    placeholder="vd: Nguyễn Văn A (tùy chọn)"
+                    placeholder="vd: Nguyễn Văn A"
                     value={formData.fullName}
                     onChange={handleInputChange}
                     onBlur={handleFieldBlur}
                     error={errors.fullName}
+                    required
                   />
 
                   <InputField
